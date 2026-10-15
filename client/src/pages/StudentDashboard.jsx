@@ -5,6 +5,8 @@ import api from "../services/api";
 import LogoutModal from "../components/LogoutModal";
 import ComplaintForm from "./ComplaintForm";
 import MyComplaints from "./MyComplaints";
+import CampusFixChatbot from "../components/CampusFixChatbot";
+
 
 function StudentDashboard() {
   const navigate = useNavigate();
@@ -677,50 +679,10 @@ function StudentDashboard() {
     );
   };
 
-  const renderChatbotPlaceholder = () => {
-    return (
-      <div className="flex min-h-[520px] items-center justify-center">
-        <div
-          className={`w-full max-w-xl rounded-3xl border p-8 text-center shadow-sm ${darkMode
-            ? "border-slate-700 bg-slate-900"
-            : "border-slate-200 bg-white"
-            }`}
-        >
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-50 text-3xl text-indigo-600">
-            ✦
-          </div>
 
-          <p className="mt-5 text-xs font-black uppercase tracking-[0.16em] text-indigo-500">
-            CampusFix AI
-          </p>
 
-          <h2
-            className={`mt-2 text-2xl font-black ${darkMode ? "text-white" : "text-slate-900"
-              }`}
-          >
-            AI Chatbot Coming Soon
-          </h2>
+<CampusFixChatbot darkMode={darkMode} />
 
-          <p
-            className={`mx-auto mt-3 max-w-md text-sm leading-6 ${darkMode ? "text-slate-400" : "text-slate-500"
-              }`}
-          >
-            Soon you will be able to ask CampusFix questions about
-            complaints, complaint status, reporting problems,
-            technicians and campus maintenance.
-          </p>
-
-          <button
-            type="button"
-            onClick={goToDashboard}
-            className="mt-6 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-extrabold text-white shadow-sm transition hover:bg-indigo-700"
-          >
-            Back to Dashboard
-          </button>
-        </div>
-      </div>
-    );
-  };
 
   const renderDashboard = () => {
     return (
@@ -1213,7 +1175,7 @@ function StudentDashboard() {
     }
 
     if (currentSection === "chatbot") {
-      return renderChatbotPlaceholder();
+      return <CampusFixChatbot darkMode={darkMode} />
     }
 
     return renderDashboard();
