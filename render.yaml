@@ -24,12 +24,13 @@ services:
         sync: false
 
   # 2. Frontend Static Site (React + Vite)
-  - type: static
+  - type: web
     name: campus-maintenance-frontend
+    runtime: static
     plan: free
     rootDir: client
     buildCommand: npm install && npm run build
-    staticPublishPath: dist
+    staticPublishPath: ./dist
     routes:
       - type: rewrite
         source: /*
