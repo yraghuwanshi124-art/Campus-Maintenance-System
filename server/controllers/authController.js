@@ -266,11 +266,16 @@ const registerUser = async (req, res) => {
 
     // ================= SEND EMAIL OTP =================
 
-    await sendVerificationOTP(normalizedEmail, otp);
+    const emailRes = await sendVerificationOTP(normalizedEmail, otp);
+
+    const message = (emailRes?.devMode || !process.env.EMAIL_USER)
+      ? `Verification OTP generated! (Dev OTP: ${otp})`
+      : "Verification OTP sent to your email.";
 
     return res.status(200).json({
-      message: "Verification OTP sent to your email.",
+      message,
       email: normalizedEmail,
+      ...(emailRes?.devMode ? { devOtp: otp } : {}),
     });
   } catch (error) {
     console.error("REGISTRATION ERROR:", error);
@@ -510,10 +515,14 @@ await user.updateOne({
   ),
 });
 
-    await sendPasswordResetOTP(normalizedEmail, otp);
+    const emailRes = await sendPasswordResetOTP(normalizedEmail, otp);
+
+    const message = (emailRes?.devMode || !process.env.EMAIL_USER)
+      ? `Password reset OTP generated! (Dev OTP: ${otp})`
+      : "Password reset OTP sent to your email.";
 
     return res.status(200).json({
-      message: "Password reset OTP sent to your email.",
+      message,
       email: normalizedEmail,
     });
   } catch (error) {

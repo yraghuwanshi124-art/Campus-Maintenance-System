@@ -1,23 +1,29 @@
 
 const nodemailer = require("nodemailer");
 
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+let transporter = null;
 
-transporter.verify((error, success) => {
-  if (error) {
-    console.error("SMTP CONNECTION ERROR:", error);
-  } else {
-    console.log("SMTP SERVER READY");
-  }
-});
+if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+  transporter = nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
+
+  transporter.verify((error, success) => {
+    if (error) {
+      console.error("SMTP CONNECTION ERROR:", error.message);
+    } else {
+      console.log("SMTP SERVER READY");
+    }
+  });
+} else {
+  console.log("NOTICE: EMAIL_USER or EMAIL_PASS not set in server/.env. OTPs will be logged to console in Development Mode.");
+}
 
 console.log("EMAIL_USER:", process.env.EMAIL_USER);
 console.log("EMAIL_PASS exists:", !!process.env.EMAIL_PASS);
@@ -220,6 +226,15 @@ const sendComplaintResolvedEmail = async (complaint) => {
 // ================= REGISTRATION VERIFICATION OTP =================
 
 const sendVerificationOTP = async (email, otp) => {
+  console.log("=================================================");
+  console.log(`[CAMPUSFIX] Registration OTP for ${email}: ${otp}`);
+  console.log("=================================================");
+
+  if (!transporter || !process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.log("[EMAIL SERVICE] Notice: EMAIL_USER/PASS not configured. Returning in Development Mode.");
+    return { devMode: true, otp };
+  }
+
   try {
     await transporter.sendMail({
       from: `"CampusFix" <${process.env.EMAIL_USER}>`,
@@ -261,16 +276,27 @@ const sendVerificationOTP = async (email, otp) => {
       `,
     });
 
-    console.log("Verification OTP sent successfully");
+    console.log("Verification OTP sent successfully via Email");
+    return { success: true };
   } catch (error) {
     console.log("OTP email failed:", error.message);
-    throw error;
+    // Don't crash registration - OTP was already printed to console
+    return { success: false, error: error.message };
   }
 };
 
 // ================= PASSWORD RESET OTP =================
 
 const sendPasswordResetOTP = async (email, otp) => {
+  console.log("=================================================");
+  console.log(`[CAMPUSFIX] Password Reset OTP for ${email}: ${otp}`);
+  console.log("=================================================");
+
+  if (!transporter || !process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.log("[EMAIL SERVICE] Notice: EMAIL_USER/PASS not configured. Returning in Development Mode.");
+    return { devMode: true, otp };
+  }
+
   try {
     await transporter.sendMail({
       from: `"CampusFix" <${process.env.EMAIL_USER}>`,
@@ -339,14 +365,14 @@ const sendPasswordResetOTP = async (email, otp) => {
       `,
     });
 
-    console.log("Password reset OTP sent successfully");
+    console.log("Password reset OTP sent successfully via Email");
+    return { success: true };
   } catch (error) {
     console.log(
       "Password reset OTP email failed:",
       error.message
     );
-
-    throw error;
+    return { success: false, error: error.message };
   }
 };
 

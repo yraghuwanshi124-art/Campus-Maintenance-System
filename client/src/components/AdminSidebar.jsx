@@ -1,5 +1,17 @@
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
+import {
+  LayoutDashboard,
+  Bot,
+  FileBarChart,
+  ClipboardList,
+  Settings,
+  LogOut,
+  ChevronLeft,
+  Menu,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react";
 
 function AdminSidebar({ onLogout }) {
   const [isOpen, setIsOpen] = useState(true);
@@ -8,206 +20,172 @@ function AdminSidebar({ onLogout }) {
     {
       name: "Dashboard",
       path: "/admin",
-      icon: "⌂",
+      icon: LayoutDashboard,
     },
-{
-  name: "AI Chatbot",
-  path: "/admin/ai-chatbot",
-  icon: "🤖",
-},
+    {
+      name: "AI Assistant",
+      path: "/admin/ai-chatbot",
+      icon: Bot,
+      badge: "AI",
+    },
     {
       name: "Monthly Reports",
       path: "/admin/monthly-report",
-      icon: "▥",
+      icon: FileBarChart,
     },
     {
       name: "All Complaints",
       path: "/admin/complaints",
-      icon: "▤",
+      icon: ClipboardList,
     },
     {
       name: "Settings",
       path: "/admin/settings",
-      icon: "⚙",
+      icon: Settings,
     },
   ];
 
   return (
     <>
-      {/* ================= SIDEBAR TOGGLE ================= */}
-
+      {/* ================= SIDEBAR TOGGLE BUTTON ================= */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className={`fixed top-5 z-50 flex h-15 w-15 items-center justify-center rounded-xl border border-indigo-100 bg-white text-lg font-bold text-indigo-600 shadow-md transition-all duration-300 hover:bg-indigo-50 hover:shadow-lg ${
-          isOpen ? "left-[270px]" : "left-5"
+        className={`fixed top-4 z-50 flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white/95 text-slate-600 shadow-sm backdrop-blur-md transition-all duration-300 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600 hover:shadow-md ${
+          isOpen ? "left-[236px]" : "left-4"
         }`}
         aria-label={isOpen ? "Collapse sidebar" : "Expand sidebar"}
       >
-        {isOpen ? "‹" : "☰"}
+        {isOpen ? <ChevronLeft className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
       </button>
 
-      {/* ================= MOBILE OVERLAY ================= */}
-
+      {/* ================= MOBILE BACKDROP ================= */}
       {isOpen && (
         <div
           onClick={() => setIsOpen(false)}
-          className="fixed inset-0 z-30 bg-slate-900/20 backdrop-blur-[1px] lg:hidden"
+          className="fixed inset-0 z-30 bg-slate-900/30 backdrop-blur-xs lg:hidden"
         ></div>
       )}
 
-      {/* ================= SIDEBAR ================= */}
-
+      {/* ================= SIDEBAR ASIDE ================= */}
       <aside
-        className={`fixed left-0 top-0 z-40 h-screen overflow-hidden border-r border-indigo-100 bg-gradient-to-b from-indigo-50 via-white to-slate-50 shadow-xl transition-all duration-300 ${
-          isOpen
-            ? "w-64 translate-x-0"
-            : "w-64 -translate-x-full"
-        } lg:translate-x-0 ${
-          isOpen ? "lg:w-64" : "lg:w-20"
-        }`}
+        className={`fixed left-0 top-0 z-40 h-screen overflow-hidden border-r border-slate-200/80 bg-white shadow-xl transition-all duration-300 ${
+          isOpen ? "w-64 translate-x-0" : "w-64 -translate-x-full"
+        } lg:translate-x-0 ${isOpen ? "lg:w-64" : "lg:w-20"}`}
       >
-        {/* Decorative background */}
-        <div className="pointer-events-none absolute -left-16 -top-16 h-48 w-48 rounded-full bg-indigo-100/60 blur-3xl"></div>
+        {/* Subtle decorative background light */}
+        <div className="pointer-events-none absolute -top-12 -left-12 h-36 w-36 rounded-full bg-indigo-50 blur-2xl"></div>
 
-        <div className="pointer-events-none absolute -bottom-20 -right-20 h-56 w-56 rounded-full bg-indigo-100/50 blur-3xl"></div>
-
-        {/* ================= BRAND ================= */}
-
+        {/* ================= BRAND HEADER ================= */}
         <div
-          className={`relative flex h-24 items-center border-b border-indigo-100 bg-white/80 backdrop-blur-sm ${
-            isOpen
-              ? "justify-between px-5"
-              : "justify-center px-2"
+          className={`relative flex h-20 items-center border-b border-slate-100 px-5 ${
+            isOpen ? "justify-between" : "justify-center"
           }`}
         >
           {isOpen ? (
             <div className="flex items-center gap-3">
-              {/* Logo */}
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-600 text-xl font-black text-white shadow-md shadow-indigo-200">
-                C
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-700 font-bold text-white shadow-md shadow-indigo-500/20">
+                <span className="text-lg tracking-tight font-black">CF</span>
               </div>
-
-              <div>
-                <h1 className="text-xl font-black tracking-tight text-indigo-700">
-                  CampusFix
-                </h1>
-
-                <p className="mt-0.5 text-[10px] font-extrabold uppercase tracking-[0.18em] text-slate-400">
-                  Admin Portal
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <h1 className="text-base font-extrabold tracking-tight text-slate-900">
+                    CampusFix
+                  </h1>
+                  <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[9px] font-bold text-indigo-600 uppercase">
+                    Admin
+                  </span>
+                </div>
+                <p className="truncate text-[11px] font-medium text-slate-400">
+                  Medi-Caps University
                 </p>
               </div>
             </div>
           ) : (
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-600 text-xl font-black text-white shadow-md shadow-indigo-200">
-              C
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-700 text-sm font-black text-white shadow-md shadow-indigo-500/20">
+              CF
             </div>
           )}
         </div>
 
         {/* ================= NAVIGATION ================= */}
-
-        <nav className="relative px-3 py-7">
+        <nav className="relative flex-1 px-3 py-6">
           {isOpen && (
-            <div className="mb-4 px-3">
-              <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-slate-400">
-                Administration
+            <div className="mb-3 px-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Management
               </p>
             </div>
           )}
 
-          <div className="space-y-2">
-            {menuItems.map((item) => (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                end={item.path === "/admin"}
-                onClick={() => {
-                  if (window.innerWidth < 1024) {
-                    setIsOpen(false);
+          <div className="space-y-1.5">
+            {menuItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  end={item.path === "/admin"}
+                  onClick={() => {
+                    if (window.innerWidth < 1024) {
+                      setIsOpen(false);
+                    }
+                  }}
+                  title={!isOpen ? item.name : ""}
+                  className={({ isActive }) =>
+                    `group relative flex items-center rounded-xl transition-all duration-200 ${
+                      isOpen ? "gap-3 px-3.5 py-2.5" : "justify-center px-2 py-2.5"
+                    } ${
+                      isActive
+                        ? "bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/20 font-semibold"
+                        : "text-slate-600 hover:bg-slate-50 hover:text-indigo-600 font-medium"
+                    }`
                   }
-                }}
-                title={!isOpen ? item.name : ""}
-                className={({ isActive }) =>
-                  `group relative flex items-center rounded-2xl transition-all duration-200 ${
-                    isOpen
-                      ? "gap-4 px-4 py-3.5"
-                      : "justify-center px-2 py-3.5"
-                  } ${
-                    isActive
-                      ? "bg-indigo-600 text-white shadow-md shadow-indigo-200"
-                      : "text-slate-600 hover:bg-white hover:text-indigo-600 hover:shadow-sm"
-                  }`
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    {/* Active indicator */}
-                    {isActive && (
-                      <span className="absolute left-0 top-1/2 h-8 w-1 -translate-y-1/2 rounded-r-full bg-white"></span>
-                    )}
-
-                    {/* Icon */}
-                    <span
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg font-bold transition ${
-                        isActive
-                          ? "bg-white/15 text-white"
-                          : "bg-indigo-50 text-indigo-500 group-hover:bg-indigo-100 group-hover:text-indigo-600"
-                      }`}
-                    >
-                      {item.icon}
-                    </span>
-
-                    {/* Menu Name */}
-                    {isOpen && (
-                      <span
-                        className={`truncate text-[15px] tracking-wide ${
-                          isActive
-                            ? "font-extrabold"
-                            : "font-bold"
+                >
+                  {({ isActive }) => (
+                    <>
+                      <Icon
+                        className={`h-5 w-5 shrink-0 transition-transform duration-200 group-hover:scale-105 ${
+                          isActive ? "text-white" : "text-slate-400 group-hover:text-indigo-600"
                         }`}
-                      >
-                        {item.name}
-                      </span>
-                    )}
+                      />
 
-                    {/* Active Dot */}
-                    {isOpen && isActive && (
-                      <span className="ml-auto h-2 w-2 rounded-full bg-white"></span>
-                    )}
-                  </>
-                )}
-              </NavLink>
-            ))}
+                      {isOpen && (
+                        <span className="truncate text-sm">{item.name}</span>
+                      )}
+
+                      {isOpen && item.badge && !isActive && (
+                        <span className="ml-auto inline-flex items-center gap-0.5 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-600">
+                          <Sparkles className="h-2.5 w-2.5" />
+                          {item.badge}
+                        </span>
+                      )}
+                    </>
+                  )}
+                </NavLink>
+              );
+            })}
           </div>
         </nav>
 
-        {/* ================= BOTTOM SECTION ================= */}
-
+        {/* ================= FOOTER USER / LOGOUT ================= */}
         <div
-          className={`absolute bottom-0 left-0 right-0 border-t border-indigo-100 bg-white/90 backdrop-blur-sm ${
-            isOpen ? "p-4" : "p-2"
-          }`}
+          className={`absolute bottom-0 left-0 right-0 border-t border-slate-100 bg-slate-50/70 p-3.5 backdrop-blur-sm`}
         >
-          {/* Admin Profile / System Status */}
-
           {isOpen && (
-            <div className="mb-3 rounded-2xl border border-indigo-100 bg-indigo-50 p-3.5">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-sm font-black text-white shadow-sm">
-                  A
+            <div className="mb-2.5 rounded-xl border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-xs font-bold text-indigo-700">
+                  <ShieldCheck className="h-4 w-4 text-indigo-600" />
                 </div>
-
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-extrabold text-slate-800">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-bold text-slate-800">
                     Administrator
                   </p>
-
-                  <div className="mt-1 flex items-center gap-1.5">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-
-                    <span className="text-[10px] font-bold text-slate-500">
-                      System Operational
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span className="text-[10px] font-medium text-slate-500">
+                      System Active
                     </span>
                   </div>
                 </div>
@@ -215,27 +193,16 @@ function AdminSidebar({ onLogout }) {
             </div>
           )}
 
-          {/* Logout */}
-
           <button
             type="button"
             onClick={onLogout}
-            title={!isOpen ? "Logout" : ""}
+            title={!isOpen ? "Sign Out" : ""}
             className={`group flex w-full items-center rounded-xl text-slate-600 transition-all duration-200 hover:bg-red-50 hover:text-red-600 ${
-              isOpen
-                ? "gap-4 px-4 py-3"
-                : "justify-center px-2 py-3"
+              isOpen ? "gap-3 px-3 py-2.5" : "justify-center p-2.5"
             }`}
           >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-base font-bold text-slate-500 transition group-hover:bg-red-100 group-hover:text-red-600">
-              ↪
-            </span>
-
-            {isOpen && (
-              <span className="text-sm font-bold">
-                Logout
-              </span>
-            )}
+            <LogOut className="h-4 w-4 text-slate-400 transition group-hover:text-red-600" />
+            {isOpen && <span className="text-xs font-semibold">Sign Out</span>}
           </button>
         </div>
       </aside>

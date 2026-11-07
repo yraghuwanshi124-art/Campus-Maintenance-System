@@ -391,7 +391,7 @@ function BlockDropdown(props) {
   );
 }
 
-function ComplaintForm() {
+function ComplaintForm({ isEmbedded = false }) {
   const navigate = useNavigate();
 
   const user = JSON.parse(localStorage.getItem("user"));
@@ -675,44 +675,46 @@ function ComplaintForm() {
     duplicateComplaint?.supporters?.length || 0;
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* ================= NAVBAR ================= */}
-      <nav className="border-b border-indigo-100 bg-indigo-50 shadow-sm">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          {/* Branding */}
-          <div className="flex items-center gap-5">
-            <div className="rounded-xl bg-white px-3 py-1.5 shadow-sm">
-              <img
-                src="https://www.medicaps.ac.in/public/frontend/images/medicaps-logo-fin.webp"
-                alt="Medi-Caps University"
-                className="h-11 w-auto object-contain"
-              />
+    <div className={isEmbedded ? "" : "min-h-screen bg-slate-50"}>
+      {/* ================= NAVBAR (ONLY WHEN NOT EMBEDDED) ================= */}
+      {!isEmbedded && (
+        <nav className="border-b border-indigo-100 bg-indigo-50 shadow-sm">
+          <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+            {/* Branding */}
+            <div className="flex items-center gap-5">
+              <div className="rounded-xl bg-white px-3 py-1.5 shadow-sm">
+                <img
+                  src="https://www.medicaps.ac.in/public/frontend/images/medicaps-logo-fin.webp"
+                  alt="Medi-Caps University"
+                  className="h-11 w-auto object-contain"
+                />
+              </div>
+
+              <div className="hidden border-l-2 border-indigo-200 pl-5 sm:block">
+                <p className="text-xl font-extrabold tracking-tight text-indigo-700">
+                  CampusFix
+                </p>
+
+                <p className="mt-1 text-sm font-medium text-slate-600">
+                  Campus Maintenance Management System
+                </p>
+              </div>
             </div>
 
-            <div className="hidden border-l-2 border-indigo-200 pl-5 sm:block">
-              <p className="text-xl font-extrabold tracking-tight text-indigo-700">
-                CampusFix
-              </p>
-
-              <p className="mt-1 text-sm font-medium text-slate-600">
-                Campus Maintenance Management System
-              </p>
-            </div>
+            {/* Back Button */}
+            <button
+              type="button"
+              onClick={() => navigate("/student")}
+              className="rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-indigo-600 shadow-sm transition hover:bg-indigo-100"
+            >
+              ← Dashboard
+            </button>
           </div>
-
-          {/* Back Button */}
-          <button
-            type="button"
-            onClick={() => navigate("/student")}
-            className="rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-indigo-600 shadow-sm transition hover:bg-indigo-100"
-          >
-            ← Dashboard
-          </button>
-        </div>
-      </nav>
+        </nav>
+      )}
 
       {/* ================= MAIN ================= */}
-      <main className="mx-auto max-w-4xl px-5 py-10 sm:px-6">
+      <main className={isEmbedded ? "mx-auto max-w-4xl" : "mx-auto max-w-4xl px-5 py-10 sm:px-6"}>
         {/* Page Header */}
         <div className="mb-8">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-indigo-100 px-4 py-2 text-sm font-semibold text-indigo-700">

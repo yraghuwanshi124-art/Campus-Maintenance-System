@@ -1,12 +1,39 @@
-
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import {
+  Search,
+  X,
+  CheckCircle2,
+  Clock,
+  Wrench,
+  UserCheck,
+  BarChart3,
+  ChevronDown,
+  ChevronUp,
+  MapPin,
+  GraduationCap,
+  Phone,
+  Mail,
+  AlertTriangle,
+  Calendar,
+  Sparkles,
+  Camera,
+  Trash2,
+  Lightbulb,
+  ArrowRight,
+  PlusCircle,
+  ClipboardList,
+  Layers,
+  HeartHandshake,
+  KeyRound,
+  ExternalLink,
+} from "lucide-react";
 import api from "../services/api";
 import LogoutModal from "../components/LogoutModal";
+import StudentSidebar from "../components/StudentSidebar";
 import ComplaintForm from "./ComplaintForm";
 import MyComplaints from "./MyComplaints";
 import CampusFixChatbot from "../components/CampusFixChatbot";
-
 
 function StudentDashboard() {
   const navigate = useNavigate();
@@ -21,9 +48,11 @@ function StudentDashboard() {
   const [showLogout, setShowLogout] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  const [darkMode, setDarkMode] = useState(
-    localStorage.getItem("campusfix_student_dark_mode") === "true"
-  );
+  // Search, filter, recent toggle, and card expansion (matching AdminDashboard)
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [showAllComplaints, setShowAllComplaints] = useState(false);
+  const [expandedComplaints, setExpandedComplaints] = useState({});
 
   const [profileImage, setProfileImage] = useState(
     localStorage.getItem("campusfix_student_profile_image") || ""
@@ -33,20 +62,12 @@ function StudentDashboard() {
     location.pathname === "/student/report"
       ? "report"
       : location.pathname === "/student/complaints"
-        ? "complaints"
-        : new URLSearchParams(location.search).get("section") ||
-        "dashboard";
+      ? "complaints"
+      : new URLSearchParams(location.search).get("section") || "dashboard";
 
   useEffect(() => {
     fetchComplaints();
   }, []);
-
-  useEffect(() => {
-    localStorage.setItem(
-      "campusfix_student_dark_mode",
-      darkMode.toString()
-    );
-  }, [darkMode]);
 
   const fetchComplaints = async () => {
     try {
@@ -59,7 +80,6 @@ function StudentDashboard() {
       });
 
       const responseData = response.data;
-
       let complaintsData = [];
 
       if (Array.isArray(responseData)) {
@@ -81,58 +101,99 @@ function StudentDashboard() {
     }
   };
 
+  const toggleComplaint = (complaintId) => {
+    setExpandedComplaints((prev) => ({
+      ...prev,
+      [complaintId]: !prev[complaintId],
+    }));
+  };
+
+  // Metrics (matching AdminDashboard)
   const total = complaints.length;
+  const pending = complaints.filter((item) => item.status === "Pending").length;
+  const assigned = complaints.filter((item) => item.status === "Assigned").length;
+  const inProgress = complaints.filter((item) => item.status === "In Progress").length;
+  const resolved = complaints.filter((item) => item.status === "Resolved").length;
 
-  const pending = complaints.filter(
-    (item) => item.status === "Pending"
-  ).length;
+  // Filter logic (matching AdminDashboard)
+  const filteredComplaints = complaints.filter((item) => {
+    const search = searchTerm.toLowerCase().trim();
 
-  const assigned = complaints.filter(
-    (item) => item.status === "Assigned"
-  ).length;
+    const matchesSearch =
+      !search ||
+      item.title?.toLowerCase().includes(search) ||
+      item.description?.toLowerCase().includes(search) ||
+      item.category?.toLowerCase().includes(search) ||
+      item.block?.toLowerCase().includes(search) ||
+      item.room?.toLowerCase().includes(search) ||
+      item._id?.toLowerCase().includes(search);
 
-  const inProgress = complaints.filter(
-    (item) => item.status === "In Progress"
-  ).length;
+    const matchesStatus =
+      statusFilter === "All" || item.status === statusFilter;
 
-  const resolved = complaints.filter(
-    (item) => item.status === "Resolved"
-  ).length;
+    return matchesSearch && matchesStatus;
+  });
 
-  const recentComplaints = complaints.slice(0, 3);
+  const displayedComplaints =
+    showAllComplaints || searchTerm.trim() || statusFilter !== "All"
+      ? filteredComplaints
+      : filteredComplaints.slice(0, 3);
 
-  const getStatusStyle = (status) => {
+  // Status Styling (matching AdminDashboard)
+  const getStatusBadge = (status) => {
     switch (status) {
       case "Resolved":
-        return "bg-emerald-50 text-emerald-700 border-emerald-100";
-
+        return {
+          pill: "border-emerald-200 bg-emerald-50 text-emerald-700",
+          icon: CheckCircle2,
+          dot: "bg-emerald-500",
+        };
       case "In Progress":
-        return "bg-blue-50 text-blue-700 border-blue-100";
-
+        return {
+          pill: "border-purple-200 bg-purple-50 text-purple-700",
+          icon: Wrench,
+          dot: "bg-purple-500",
+        };
       case "Assigned":
-        return "bg-violet-50 text-violet-700 border-violet-100";
-
+        return {
+          pill: "border-blue-200 bg-blue-50 text-blue-700",
+          icon: UserCheck,
+          dot: "bg-blue-500",
+        };
       default:
-        return "bg-amber-50 text-amber-700 border-amber-100";
+        return {
+          pill: "border-amber-200 bg-amber-50 text-amber-700",
+          icon: Clock,
+          dot: "bg-amber-500",
+        };
     }
   };
 
-  const getPriorityStyle = (priority) => {
+  // Priority Styling (matching AdminDashboard)
+  const getPriorityBadge = (priority) => {
     switch (priority) {
       case "High":
-        return "bg-red-50 text-red-600 border-red-100";
-
+        return "border-red-200 bg-red-50 text-red-700";
       case "Medium":
-        return "bg-orange-50 text-orange-600 border-orange-100";
-
+        return "border-amber-200 bg-amber-50 text-amber-700";
       default:
-        return "bg-slate-50 text-slate-600 border-slate-100";
+        return "border-emerald-200 bg-emerald-50 text-emerald-700";
     }
+  };
+
+  const formatDateTime = (date) => {
+    if (!date) return "—";
+    return new Date(date).toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   const formatDate = (date) => {
     if (!date) return "—";
-
     return new Date(date).toLocaleDateString("en-IN", {
       day: "2-digit",
       month: "short",
@@ -140,70 +201,15 @@ function StudentDashboard() {
     });
   };
 
-  /*
-   * CENTRAL NAVIGATION FUNCTION
-   *
-   * Every sidebar option uses this function.
-   * No activeSection state is used anymore.
-   */
-  const handleMenuClick = (item) => {
-    switch (item.id) {
-      case "dashboard":
-        navigate("/student");
-        break;
-
-      case "profile":
-        navigate("/student?section=profile");
-        break;
-
-      case "report":
-        navigate("/student/report");
-        break;
-
-      case "complaints":
-        navigate("/student/complaints");
-        break;
-
-      case "chatbot":
-        navigate("/student?section=chatbot");
-        break;
-
-      case "activity":
-        navigate("/student?section=activity");
-        break;
-
-      default:
-        navigate("/student");
-    }
-  };
-
-  const goToProfile = () => {
-    navigate("/student?section=profile");
-  };
-
-  const goToActivity = () => {
-    navigate("/student?section=activity");
-  };
-
-  const goToChatbot = () => {
-    navigate("/student?section=chatbot");
-  };
-
-  const goToDashboard = () => {
-    navigate("/student");
-  };
-
-  const goToReport = () => {
-    navigate("/student/report");
-  };
-
-  const goToComplaints = () => {
-    navigate("/student/complaints");
-  };
+  const goToProfile = () => navigate("/student?section=profile");
+  const goToActivity = () => navigate("/student?section=activity");
+  const goToChatbot = () => navigate("/student?section=chatbot");
+  const goToDashboard = () => navigate("/student");
+  const goToReport = () => navigate("/student/report");
+  const goToComplaints = () => navigate("/student/complaints");
 
   const handleProfileImage = (event) => {
     const file = event.target.files?.[0];
-
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
@@ -217,92 +223,39 @@ function StudentDashboard() {
     }
 
     const reader = new FileReader();
-
     reader.onload = () => {
       const image = reader.result;
-
       setProfileImage(image);
-
-      localStorage.setItem(
-        "campusfix_student_profile_image",
-        image
-      );
+      localStorage.setItem("campusfix_student_profile_image", image);
     };
-
     reader.readAsDataURL(file);
   };
 
   const removeProfileImage = () => {
     setProfileImage("");
-
-    localStorage.removeItem(
-      "campusfix_student_profile_image"
-    );
-
+    localStorage.removeItem("campusfix_student_profile_image");
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   };
 
-  const menuItems = [
-    {
-      id: "dashboard",
-      label: "Dashboard",
-      icon: "⌂",
-    },
-    {
-      id: "profile",
-      label: "My Profile",
-      icon: "♙",
-    },
-    {
-      id: "report",
-      label: "Report Problem",
-      icon: "＋",
-    },
-    {
-      id: "complaints",
-      label: "All Complaints",
-      icon: "▤",
-    },
-    {
-      id: "chatbot",
-      label: "AI Chatbot",
-      icon: "✦",
-    },
-    {
-      id: "activity",
-      label: "My Activity",
-      icon: "◷",
-    },
-  ];
-
+  /* ------------------------------------------------------------------ */
+  /* PROFILE VIEW                                                        */
+  /* ------------------------------------------------------------------ */
   const renderProfile = () => {
     return (
       <div className="space-y-6">
-        <div
-          className={`overflow-hidden rounded-3xl border ${darkMode
-            ? "border-slate-700 bg-slate-900"
-            : "border-indigo-100 bg-white"
-            } shadow-sm`}
-        >
-          <div
-            className={`h-28 ${darkMode
-              ? "bg-gradient-to-r from-indigo-950 via-indigo-900 to-slate-900"
-              : "bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-500"
-              }`}
-          ></div>
+        {/* Profile Card Header */}
+        <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xs">
+          <div className="h-32 bg-gradient-to-r from-slate-900 via-indigo-950 to-indigo-900 relative">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white/10 via-transparent to-transparent"></div>
+          </div>
 
-          <div className="px-5 pb-6 sm:px-7">
+          <div className="px-6 pb-6 sm:px-8">
             <div className="-mt-12 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
                 <div className="relative">
-                  <div
-                    className={`flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl border-4 ${darkMode
-                      ? "border-slate-900 bg-slate-800"
-                      : "border-white bg-indigo-50"
-                      } shadow-lg`}
-                  >
+                  <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl border-4 border-white bg-indigo-50 shadow-md">
                     {profileImage ? (
                       <img
                         src={profileImage}
@@ -319,10 +272,10 @@ function StudentDashboard() {
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="absolute -bottom-2 -right-2 flex h-9 w-9 items-center justify-center rounded-xl border-2 border-white bg-indigo-600 text-white shadow-md transition hover:bg-indigo-700"
+                    className="absolute -bottom-1.5 -right-1.5 flex h-8 w-8 items-center justify-center rounded-lg border-2 border-white bg-indigo-600 text-white shadow-sm transition hover:bg-indigo-700"
                     title="Change profile photo"
                   >
-                    ✎
+                    <Camera className="h-4 w-4" />
                   </button>
 
                   <input
@@ -335,26 +288,19 @@ function StudentDashboard() {
                 </div>
 
                 <div>
-                  <h2
-                    className={`text-2xl font-black ${darkMode ? "text-white" : "text-slate-900"
-                      }`}
-                  >
+                  <h2 className="text-2xl font-black tracking-tight text-slate-900">
                     {user.name || "Student"}
                   </h2>
 
                   <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-bold ${darkMode
-                        ? "bg-indigo-950 text-indigo-300"
-                        : "bg-indigo-50 text-indigo-700"
-                        }`}
-                    >
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700">
+                      <GraduationCap className="h-3.5 w-3.5" />
                       Student
                     </span>
 
-                    <span className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-                      Active
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                      Verified Student Account
                     </span>
                   </div>
                 </div>
@@ -364,11 +310,9 @@ function StudentDashboard() {
                 <button
                   type="button"
                   onClick={removeProfileImage}
-                  className={`rounded-xl border px-4 py-2 text-sm font-bold transition ${darkMode
-                    ? "border-slate-700 text-slate-300 hover:bg-slate-800"
-                    : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                    }`}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3.5 py-2 text-xs font-bold text-rose-600 transition hover:bg-rose-50"
                 >
+                  <Trash2 className="h-3.5 w-3.5" />
                   Remove Photo
                 </button>
               )}
@@ -376,53 +320,43 @@ function StudentDashboard() {
           </div>
         </div>
 
+        {/* Details Grid */}
         <div className="grid gap-6 xl:grid-cols-2">
-          <div
-            className={`rounded-3xl border p-6 shadow-sm ${darkMode
-              ? "border-slate-700 bg-slate-900"
-              : "border-slate-200 bg-white"
-              }`}
-          >
-            <div className="mb-6">
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-indigo-500">
-                Academic Information
-              </p>
-
-              <h3
-                className={`mt-1 text-lg font-black ${darkMode ? "text-white" : "text-slate-900"
-                  }`}
-              >
-                Student Details
-              </h3>
+          {/* Academic Info */}
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-2xs">
+            <div className="mb-6 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                <GraduationCap className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-indigo-600">
+                  Academic Record
+                </p>
+                <h3 className="text-lg font-black text-slate-900">
+                  Student Details
+                </h3>
+              </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              {
-                [
-                  ["Full Name", user.name || "—"],
-                  ["Enrollment No.", user.enrollmentNumber || "—"],
-                  ["University", "Medi-Caps University"],
-                  ["Course", "B.Tech"],
-                  ["Branch", user.branch || "—"],
-                  ["Semester", user.semester || "—"],
-                  ["Section", user.classSection || "—"],
-                  ["Department", user.department || "—"],
-                ].map(([label, value]) => (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {[
+                ["Full Name", user.name || "—"],
+                ["Enrollment No.", user.enrollmentNumber || "—"],
+                ["University", "Medi-Caps University"],
+                ["Course", "B.Tech"],
+                ["Branch", user.branch || "—"],
+                ["Semester", user.semester ? `Semester ${user.semester}` : "—"],
+                ["Class / Section", user.classSection || "—"],
+                ["Department", user.department || "Engineering"],
+              ].map(([label, value]) => (
                 <div
                   key={label}
-                  className={`rounded-2xl border p-4 ${darkMode
-                    ? "border-slate-700 bg-slate-800"
-                    : "border-slate-100 bg-slate-50"
-                    }`}
+                  className="rounded-xl border border-slate-100 bg-slate-50/70 p-3.5"
                 >
                   <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
                     {label}
                   </p>
-
-                  <p
-                    className={`mt-1 text-sm font-bold ${darkMode ? "text-slate-200" : "text-slate-800"
-                      }`}
-                  >
+                  <p className="mt-1 text-sm font-bold truncate text-slate-800">
                     {value}
                   </p>
                 </div>
@@ -430,80 +364,66 @@ function StudentDashboard() {
             </div>
           </div>
 
-          <div
-            className={`rounded-3xl border p-6 shadow-sm ${darkMode
-              ? "border-slate-700 bg-slate-900"
-              : "border-slate-200 bg-white"
-              }`}
-          >
-            <div className="mb-6">
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-indigo-500">
-                Account
-              </p>
-
-              <h3
-                className={`mt-1 text-lg font-black ${darkMode ? "text-white" : "text-slate-900"
-                  }`}
-              >
-                Contact & Security
-              </h3>
+          {/* Account & Contact */}
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-2xs">
+            <div className="mb-6 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                <Mail className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-indigo-600">
+                  Account Credentials
+                </p>
+                <h3 className="text-lg font-black text-slate-900">
+                  Contact & Security
+                </h3>
+              </div>
             </div>
 
-            <div className="space-y-4">
-              <div
-                className={`rounded-2xl border p-4 ${darkMode
-                  ? "border-slate-700 bg-slate-800"
-                  : "border-slate-100 bg-slate-50"
-                  }`}
-              >
-                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
-                  College Email
-                </p>
-
-                <p
-                  className={`mt-1 break-all text-sm font-bold ${darkMode ? "text-slate-200" : "text-slate-800"
-                    }`}
-                >
-                  {user.email || "—"}
-                </p>
+            <div className="space-y-3.5">
+              <div className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/70 p-4">
+                <Mail className="h-4 w-4 text-slate-400 mt-0.5" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                    College Email
+                  </p>
+                  <p className="mt-0.5 break-all text-sm font-bold text-slate-800">
+                    {user.email || "—"}
+                  </p>
+                </div>
               </div>
 
-              <div
-                className={`rounded-2xl border p-4 ${darkMode
-                  ? "border-slate-700 bg-slate-800"
-                  : "border-slate-100 bg-slate-50"
-                  }`}
-              >
-                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
-                  Phone
-                </p>
-
-                <p
-                  className={`mt-1 text-sm font-bold ${darkMode ? "text-slate-200" : "text-slate-800"
-                    }`}
-                >
-                 {user.phoneNumber || "Not added"}
-                </p>
+              <div className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/70 p-4">
+                <Phone className="h-4 w-4 text-slate-400 mt-0.5" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                    Registered Mobile
+                  </p>
+                  <p className="mt-0.5 text-sm font-bold text-slate-800">
+                    {user.phoneNumber || "Not registered"}
+                  </p>
+                </div>
               </div>
 
               <button
                 type="button"
                 onClick={() => navigate("/forgot-password")}
-                className="flex w-full items-center justify-between rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-4 text-left transition hover:bg-indigo-100"
+                className="group flex w-full items-center justify-between rounded-xl border border-indigo-100 bg-indigo-50/70 p-4 text-left transition hover:bg-indigo-100/70"
               >
-                <div>
-                  <p className="text-sm font-extrabold text-indigo-800">
-                    Change Password
-                  </p>
-
-                  <p className="mt-1 text-xs font-medium text-indigo-600">
-                    Update your CampusFix account password
-                  </p>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-sm">
+                    <KeyRound className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-indigo-950">
+                      Update Password
+                    </p>
+                    <p className="text-xs text-indigo-600">
+                      Request security code & change credentials
+                    </p>
+                  </div>
                 </div>
-
-                <span className="text-xl font-bold text-indigo-600">
-                  →
-                </span>
+                <ArrowRight className="h-4 w-4 text-indigo-500 transition-transform group-hover:translate-x-0.5" />
               </button>
             </div>
           </div>
@@ -512,166 +432,110 @@ function StudentDashboard() {
     );
   };
 
+  /* ------------------------------------------------------------------ */
+  /* ACTIVITY VIEW                                                      */
+  /* ------------------------------------------------------------------ */
   const renderActivity = () => {
     return (
       <div className="space-y-6">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.16em] text-indigo-500">
-            Student Activity
-          </p>
-
-          <h2
-            className={`mt-1 text-2xl font-black ${darkMode ? "text-white" : "text-slate-900"
-              }`}
-          >
-            My Activity
+          <h2 className="text-xl font-bold text-slate-900">
+            Student Complaint History
           </h2>
-
-          <p
-            className={`mt-1 text-sm ${darkMode ? "text-slate-400" : "text-slate-500"
-              }`}
-          >
-            Track your complaint activity and maintenance requests.
+          <p className="text-xs text-slate-500">
+            Chronological log of maintenance reports submitted to Medi-Caps University facilities
           </p>
         </div>
 
+        {/* Metric Overview */}
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[
-            {
-              label: "Total",
-              value: total,
-              icon: "▤",
-              bg: "bg-indigo-50",
-              text: "text-indigo-600",
-            },
-            {
-              label: "Pending",
-              value: pending,
-              icon: "◷",
-              bg: "bg-amber-50",
-              text: "text-amber-600",
-            },
-            {
-              label: "In Progress",
-              value: inProgress,
-              icon: "↻",
-              bg: "bg-blue-50",
-              text: "text-blue-600",
-            },
-            {
-              label: "Resolved",
-              value: resolved,
-              icon: "✓",
-              bg: "bg-emerald-50",
-              text: "text-emerald-600",
-            },
-          ].map((item) => (
-            <div
-              key={item.label}
-              className={`rounded-2xl border p-5 shadow-sm ${darkMode
-                ? "border-slate-700 bg-slate-900"
-                : "border-slate-200 bg-white"
-                }`}
-            >
+            { label: "Total Reports", value: total, icon: Layers, bg: "bg-indigo-50 text-indigo-600" },
+            { label: "Pending", value: pending, icon: Clock, bg: "bg-amber-50 text-amber-600" },
+            { label: "In Progress", value: inProgress, icon: Wrench, bg: "bg-purple-50 text-purple-600" },
+            { label: "Resolved", value: resolved, icon: CheckCircle2, bg: "bg-emerald-50 text-emerald-600" },
+          ].map((item) => {
+            const IconComponent = item.icon;
+            return (
               <div
-                className={`mb-5 flex h-10 w-10 items-center justify-center rounded-xl ${item.bg} ${item.text} text-lg font-black`}
+                key={item.label}
+                className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs"
               >
-                {item.icon}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                    {item.label}
+                  </span>
+                  <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${item.bg}`}>
+                    <IconComponent className="h-4 w-4" />
+                  </div>
+                </div>
+                <p className="mt-3 text-3xl font-black text-slate-900">
+                  {item.value}
+                </p>
               </div>
-
-              <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
-                {item.label}
-              </p>
-
-              <p
-                className={`mt-1 text-3xl font-black ${darkMode ? "text-white" : "text-slate-900"
-                  }`}
-              >
-                {item.value}
-              </p>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
-        <div
-          className={`rounded-3xl border p-6 shadow-sm ${darkMode
-            ? "border-slate-700 bg-slate-900"
-            : "border-slate-200 bg-white"
-            }`}
-        >
+        {/* Activity Feed */}
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-2xs">
           <div className="mb-6">
-            <h3
-              className={`text-lg font-black ${darkMode ? "text-white" : "text-slate-900"
-                }`}
-            >
-              Recent Activity
+            <h3 className="text-base font-bold text-slate-900">
+              Complaint History Trail
             </h3>
-
-            <p className="mt-1 text-sm text-slate-400">
-              Your latest maintenance requests.
+            <p className="text-xs text-slate-400">
+              Select any request to inspect status and supervisor updates
             </p>
           </div>
 
           {complaints.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 py-12 text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-xl text-indigo-600">
-                +
+            <div className="rounded-xl border border-dashed border-slate-200 py-12 text-center">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                <PlusCircle className="h-6 w-6" />
               </div>
-
               <p className="mt-4 font-bold text-slate-700">
-                No activity yet
+                No activity logged
               </p>
-
-              <p className="mt-1 text-sm text-slate-400">
-                Your complaint activity will appear here.
+              <p className="mt-1 text-xs text-slate-400">
+                Your submitted maintenance complaints will be tracked here.
               </p>
             </div>
           ) : (
             <div className="space-y-3">
-              {complaints.slice(0, 6).map((complaint) => (
-                <button
-                  type="button"
-                  key={complaint._id}
-                  onClick={() =>
-                    navigate(
-                      `/student/complaints?id=${complaint._id}`
-                    )
-                  }
-                  className={`flex w-full items-center gap-4 rounded-2xl border p-4 text-left transition ${darkMode
-                    ? "border-slate-700 bg-slate-800 hover:border-indigo-500"
-                    : "border-slate-100 bg-slate-50 hover:border-indigo-200 hover:bg-white"
-                    }`}
-                >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 font-black text-indigo-600">
-                    {complaint.category?.charAt(0) || "C"}
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <p
-                      className={`truncate text-sm font-extrabold ${darkMode ? "text-white" : "text-slate-800"
-                        }`}
-                    >
-                      {complaint.category || "Maintenance Complaint"}
-                    </p>
-
-                    <p className="mt-1 text-xs text-slate-400">
-                      {complaint.block || "—"} • Room{" "}
-                      {complaint.room || "—"} •{" "}
-                      {formatDate(complaint.createdAt)}
-                    </p>
-                  </div>
-
-                  <span
-                    className={`hidden rounded-full border px-3 py-1 text-[11px] font-bold sm:block ${getStatusStyle(
-                      complaint.status
-                    )}`}
+              {complaints.map((complaint) => {
+                const badge = getStatusBadge(complaint.status);
+                const BadgeIcon = badge.icon;
+                return (
+                  <button
+                    type="button"
+                    key={complaint._id}
+                    onClick={() => navigate(`/student/complaints?id=${complaint._id}`)}
+                    className="group flex w-full items-center justify-between gap-4 rounded-xl border border-slate-100 bg-slate-50/70 p-4 text-left transition hover:border-indigo-200 hover:bg-white hover:shadow-2xs"
                   >
-                    {complaint.status || "Pending"}
-                  </span>
+                    <div className="flex min-w-0 items-center gap-3.5">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-700 text-white font-bold text-sm shadow-sm">
+                        {complaint.category?.charAt(0) || "M"}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-slate-900">
+                          {complaint.category || "Maintenance Request"}
+                        </p>
+                        <p className="mt-0.5 truncate text-xs text-slate-400">
+                          {complaint.block || "Block"} • Room {complaint.room || "—"} • {formatDate(complaint.createdAt)}
+                        </p>
+                      </div>
+                    </div>
 
-                  <span className="text-slate-400">›</span>
-                </button>
-              ))}
+                    <div className="flex shrink-0 items-center gap-3">
+                      <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${badge.pill}`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${badge.dot}`}></span>
+                        {complaint.status || "Pending"}
+                      </span>
+                      <ArrowRight className="h-4 w-4 text-slate-400 transition-transform group-hover:translate-x-0.5" />
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
@@ -679,491 +543,622 @@ function StudentDashboard() {
     );
   };
 
-
-
-<CampusFixChatbot darkMode={darkMode} />
-
-
+  /* ------------------------------------------------------------------ */
+  /* DASHBOARD MAIN VIEW (EXACTLY MATCHING ADMIN DASHBOARD UI)          */
+  /* ------------------------------------------------------------------ */
   const renderDashboard = () => {
     return (
-      <div className="space-y-6">
-        <section
-          className={`relative overflow-hidden rounded-3xl ${darkMode
-            ? "bg-gradient-to-br from-indigo-950 via-indigo-900 to-slate-900"
-            : "bg-gradient-to-br from-indigo-600 via-indigo-500 to-violet-500"
-            } px-6 py-7 text-white shadow-sm sm:px-8`}
-        >
-          <div className="absolute -right-16 -top-20 h-56 w-56 rounded-full bg-white/10"></div>
-          <div className="absolute -bottom-24 right-24 h-48 w-48 rounded-full bg-white/5"></div>
+      <div className="space-y-8">
+        {/* ================= HERO BANNER ================= */}
+        <div className="relative mb-8 overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-indigo-900 p-8 text-white shadow-xl sm:p-10">
+          {/* Ambient background orbs */}
+          <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-indigo-500/20 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-20 right-32 h-64 w-64 rounded-full bg-blue-500/15 blur-3xl" />
 
-          <div className="relative max-w-3xl">
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-lg font-bold">
-              <span className="h-2 w-2 rounded-full bg-emerald-300"></span>
-              Student Portal
+          <div className="relative z-10 max-w-3xl">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-indigo-200 backdrop-blur-md">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                Student Portal
+              </span>
+              <span className="text-xs text-slate-300">
+                {new Date().toLocaleDateString("en-IN", {
+                  weekday: "long",
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </span>
             </div>
 
-            <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
-              Welcome back, {user.name?.split(" ")[0] || "Student"} 👋
+            <h1 className="mt-4 text-3xl font-extrabold tracking-tight sm:text-4xl text-white">
+              Welcome back, {user?.name?.split(" ")[0] || "Student"} 👋
             </h1>
 
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-indigo-100 sm:text-base">
-              Report campus problems, track your complaints and help
-              keep Medi-Caps University running smoothly.
+            <p className="mt-3 text-base text-slate-300 leading-relaxed max-w-2xl">
+              Report campus problems, track your complaints, and help keep Medi-Caps University facilities running smoothly.
             </p>
 
-            <div className="mt-6 flex flex-wrap gap-3">
+            <div className="mt-6 flex flex-wrap items-center gap-3">
               <button
                 type="button"
                 onClick={goToReport}
-                className="rounded-xl bg-white px-5 py-3 text-sm font-extrabold text-indigo-700 shadow-sm transition hover:bg-indigo-50"
+                className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-bold text-indigo-700 shadow-md transition hover:bg-indigo-50 active:scale-95"
               >
-                + Report a Problem
+                <PlusCircle className="h-4 w-4 text-indigo-600" />
+                Report a Problem
               </button>
 
               <button
                 type="button"
                 onClick={goToComplaints}
-                className="rounded-xl border border-white/25 bg-white/10 px-5 py-3 text-sm font-extrabold text-white backdrop-blur transition hover:bg-white/20"
+                className="inline-flex items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-4 py-2.5 text-xs font-bold text-white backdrop-blur-md transition hover:bg-white/20 active:scale-95"
               >
-                Track Complaints →
+                <ClipboardList className="h-4 w-4" />
+                Track Complaints
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ================= STATS / KPI CARDS ================= */}
+        <section className="mb-8">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">
+                Performance Metrics
+              </h2>
+              <p className="text-xs text-slate-500">
+                Real-time status breakdown of your maintenance requests
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={goToComplaints}
+              className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+            >
+              View detailed list →
+            </button>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            {/* TOTAL */}
+            <div className="group rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs transition duration-200 hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Total
+                </p>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                  <BarChart3 className="h-5 w-5" />
+                </div>
+              </div>
+              <p className="mt-3 text-3xl font-black text-slate-900">
+                {total}
+              </p>
+              <p className="mt-1 text-xs font-medium text-slate-400">
+                All logged requests
+              </p>
+            </div>
+
+            {/* PENDING */}
+            <div className="group rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs transition duration-200 hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-md">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold uppercase tracking-wider text-amber-700">
+                  Pending
+                </p>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                  <Clock className="h-5 w-5" />
+                </div>
+              </div>
+              <p className="mt-3 text-3xl font-black text-amber-600">
+                {pending}
+              </p>
+              <p className="mt-1 text-xs font-medium text-slate-400">
+                Awaiting review
+              </p>
+            </div>
+
+            {/* ASSIGNED */}
+            <div className="group rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs transition duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold uppercase tracking-wider text-blue-700">
+                  Assigned
+                </p>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                  <UserCheck className="h-5 w-5" />
+                </div>
+              </div>
+              <p className="mt-3 text-3xl font-black text-blue-600">
+                {assigned}
+              </p>
+              <p className="mt-1 text-xs font-medium text-slate-400">
+                Supervisor assigned
+              </p>
+            </div>
+
+            {/* IN PROGRESS */}
+            <div className="group rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs transition duration-200 hover:-translate-y-0.5 hover:border-purple-300 hover:shadow-md">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold uppercase tracking-wider text-purple-700">
+                  In Progress
+                </p>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+                  <Wrench className="h-5 w-5" />
+                </div>
+              </div>
+              <p className="mt-3 text-3xl font-black text-purple-600">
+                {inProgress}
+              </p>
+              <p className="mt-1 text-xs font-medium text-slate-400">
+                Technician fixing
+              </p>
+            </div>
+
+            {/* RESOLVED */}
+            <div className="group rounded-2xl border border-slate-200/80 bg-white p-5 shadow-2xs transition duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">
+                  Resolved
+                </p>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                  <CheckCircle2 className="h-5 w-5" />
+                </div>
+              </div>
+              <p className="mt-3 text-3xl font-black text-emerald-600">
+                {resolved}
+              </p>
+              <p className="mt-1 text-xs font-medium text-slate-400">
+                Work completed
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* ================= SEARCH & FILTER BAR ================= */}
+        <section className="mb-8">
+          <div className="flex flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs sm:flex-row sm:items-center sm:justify-between">
+            {/* Search Input */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search by complaint, category, block, room..."
+                className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2.5 pl-10 pr-10 text-xs font-medium text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:bg-white focus:ring-3 focus:ring-indigo-50"
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm("")}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Status Filter Chips */}
+            <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+              {["All", "Pending", "Assigned", "In Progress", "Resolved"].map(
+                (status) => (
+                  <button
+                    key={status}
+                    type="button"
+                    onClick={() => setStatusFilter(status)}
+                    className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition ${
+                      statusFilter === status
+                        ? "border-indigo-600 bg-indigo-600 text-white shadow-xs"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-slate-50 hover:text-indigo-600"
+                    }`}
+                  >
+                    <span>{status}</span>
+                    <span
+                      className={`rounded-md px-1.5 py-0.2 text-[10px] font-bold ${
+                        statusFilter === status
+                          ? "bg-white/20 text-white"
+                          : "bg-slate-100 text-slate-500"
+                      }`}
+                    >
+                      {status === "All"
+                        ? total
+                        : complaints.filter((c) => c.status === status).length}
+                    </span>
+                  </button>
+                )
+              )}
+
+              {/* Show Recent 3 / View All Toggle */}
+              <button
+                type="button"
+                onClick={() => setShowAllComplaints(!showAllComplaints)}
+                className="ml-auto inline-flex items-center gap-1 rounded-xl border border-indigo-200 bg-indigo-50/60 px-3 py-1.5 text-xs font-bold text-indigo-700 transition hover:bg-indigo-100/70"
+              >
+                {showAllComplaints
+                  ? "Show Recent (3)"
+                  : `View All (${filteredComplaints.length})`}
               </button>
             </div>
           </div>
         </section>
 
-        <section>
-          <div className="mb-4 flex items-end justify-between">
+        {/* ================= COMPLAINTS LIST ================= */}
+        <section className="mb-8">
+          <div className="mb-4 flex items-center justify-between">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-indigo-500">
-                Quick Access
-              </p>
-
-              <h2
-                className={`mt-1 text-xl font-black ${darkMode ? "text-white" : "text-slate-900"
-                  }`}
-              >
-                What do you need?
+              <h2 className="text-lg font-bold text-slate-900">
+                {showAllComplaints || searchTerm || statusFilter !== "All"
+                  ? "Filtered Complaints"
+                  : "Recent Complaints"}
               </h2>
+              <p className="text-xs text-slate-500">
+                {filteredComplaints.length === 0
+                  ? "No matching requests found"
+                  : `Showing ${displayedComplaints.length} of ${filteredComplaints.length} complaints`}
+              </p>
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <button
-              type="button"
-              onClick={goToReport}
-              className={`group rounded-2xl border p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${darkMode
-                ? "border-slate-700 bg-slate-900 hover:border-indigo-500"
-                : "border-indigo-100 bg-white hover:border-indigo-200"
-                }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-xl font-black text-indigo-600">
-                  +
-                </span>
-
-                <span className="text-slate-300 transition group-hover:text-indigo-500">
-                  →
-                </span>
-              </div>
-
-              <h3
-                className={`mt-5 font-black ${darkMode ? "text-white" : "text-slate-900"
-                  }`}
-              >
-                Report Problem
-              </h3>
-
-              <p className="mt-1 text-xs leading-5 text-slate-400">
-                Report a maintenance issue with location and details.
+          {loading ? (
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-12 text-center shadow-2xs">
+              <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600"></div>
+              <p className="mt-3 text-xs font-semibold text-slate-500">
+                Loading your complaints...
               </p>
-            </button>
-
-            <button
-              type="button"
-              onClick={goToComplaints}
-              className={`group rounded-2xl border p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${darkMode
-                ? "border-slate-700 bg-slate-900 hover:border-blue-500"
-                : "border-blue-100 bg-white hover:border-blue-200"
-                }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-xl font-black text-blue-600">
-                  ▤
-                </span>
-
-                <span className="text-slate-300 transition group-hover:text-blue-500">
-                  →
-                </span>
-              </div>
-
-              <h3
-                className={`mt-5 font-black ${darkMode ? "text-white" : "text-slate-900"
-                  }`}
-              >
-                All Complaints
-              </h3>
-
-              <p className="mt-1 text-xs leading-5 text-slate-400">
-                View your submitted complaints and their progress.
-              </p>
-            </button>
-
-            <button
-              type="button"
-              onClick={goToActivity}
-              className={`group rounded-2xl border p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${darkMode
-                ? "border-slate-700 bg-slate-900 hover:border-emerald-500"
-                : "border-emerald-100 bg-white hover:border-emerald-200"
-                }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-xl font-black text-emerald-600">
-                  ◷
-                </span>
-
-                <span className="text-slate-300 transition group-hover:text-emerald-500">
-                  →
-                </span>
-              </div>
-
-              <h3
-                className={`mt-5 font-black ${darkMode ? "text-white" : "text-slate-900"
-                  }`}
-              >
-                My Activity
-              </h3>
-
-              <p className="mt-1 text-xs leading-5 text-slate-400">
-                See your complaint history and recent activity.
-              </p>
-            </button>
-
-            <button
-              type="button"
-              onClick={goToChatbot}
-              className={`group rounded-2xl border p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${darkMode
-                ? "border-slate-700 bg-slate-900 hover:border-violet-500"
-                : "border-violet-100 bg-white hover:border-violet-200"
-                }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-50 text-xl font-black text-violet-600">
-                  ✦
-                </span>
-
-                <span className="text-slate-300 transition group-hover:text-violet-500">
-                  →
-                </span>
-              </div>
-
-              <h3
-                className={`mt-5 font-black ${darkMode ? "text-white" : "text-slate-900"
-                  }`}
-              >
-                AI Chatbot
-              </h3>
-
-              <p className="mt-1 text-xs leading-5 text-slate-400">
-                Get help with CampusFix and maintenance questions.
-              </p>
-            </button>
-          </div>
-        </section>
-
-        <section>
-          <div className="mb-4 flex items-end justify-between">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-indigo-500">
-                Overview
-              </p>
-
-              <h2
-                className={`mt-1 text-xl font-black ${darkMode ? "text-white" : "text-slate-900"
-                  }`}
-              >
-                Complaint Statistics
-              </h2>
             </div>
-
-            <button
-              type="button"
-              onClick={goToComplaints}
-              className="text-sm font-bold text-indigo-600 hover:text-indigo-700"
-            >
-              View all →
-            </button>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-            {[
-              {
-                label: "Total",
-                value: total,
-                icon: "▤",
-                bg: "bg-indigo-50",
-                text: "text-indigo-600",
-              },
-              {
-                label: "Pending",
-                value: pending,
-                icon: "◷",
-                bg: "bg-amber-50",
-                text: "text-amber-600",
-              },
-              {
-                label: "Assigned",
-                value: assigned,
-                icon: "↗",
-                bg: "bg-violet-50",
-                text: "text-violet-600",
-              },
-              {
-                label: "In Progress",
-                value: inProgress,
-                icon: "↻",
-                bg: "bg-blue-50",
-                text: "text-blue-600",
-              },
-              {
-                label: "Resolved",
-                value: resolved,
-                icon: "✓",
-                bg: "bg-emerald-50",
-                text: "text-emerald-600",
-              },
-            ].map((item) => (
-              <div
-                key={item.label}
-                className={`rounded-2xl border p-5 shadow-sm ${darkMode
-                  ? "border-slate-700 bg-slate-900"
-                  : "border-slate-200 bg-white"
-                  }`}
-              >
-                <div
-                  className={`flex h-10 w-10 items-center justify-center rounded-xl ${item.bg} ${item.text} text-lg font-black`}
-                >
-                  {item.icon}
-                </div>
-
-                <p className="mt-5 text-xs font-bold uppercase tracking-wide text-slate-400">
-                  {item.label}
-                </p>
-
-                <p
-                  className={`mt-1 text-3xl font-black ${darkMode ? "text-white" : "text-slate-900"
-                    }`}
-                >
-                  {item.value}
-                </p>
+          ) : displayedComplaints.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center shadow-2xs">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
+                <ClipboardList className="h-6 w-6" />
               </div>
-            ))}
-          </div>
-        </section>
-
-        <section
-          className={`overflow-hidden rounded-3xl border shadow-sm ${darkMode
-            ? "border-slate-700 bg-slate-900"
-            : "border-slate-200 bg-white"
-            }`}
-        >
-          <div className="flex flex-col gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-indigo-500">
-                Your Requests
+              <h3 className="mt-4 text-base font-bold text-slate-800">
+                No complaints found
+              </h3>
+              <p className="mt-1 text-xs text-slate-500 max-w-sm mx-auto">
+                {searchTerm || statusFilter !== "All"
+                  ? "No complaints match your current search or status filter."
+                  : "You haven't reported any maintenance problems yet."}
               </p>
-
-              <h2
-                className={`mt-1 text-lg font-black ${darkMode ? "text-white" : "text-slate-900"
-                  }`}
+              <button
+                type="button"
+                onClick={goToReport}
+                className="mt-5 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-indigo-700"
               >
-                Recent Complaints
-              </h2>
+                <PlusCircle className="h-4 w-4" />
+                Report a Problem
+              </button>
             </div>
+          ) : (
+            <div className="space-y-4">
+              {displayedComplaints.map((complaint) => {
+                const badge = getStatusBadge(complaint.status);
+                const BadgeIcon = badge.icon;
+                const isExpanded = expandedComplaints[complaint._id];
 
-            <button
-              type="button"
-              onClick={goToComplaints}
-              className="w-fit rounded-xl bg-indigo-50 px-4 py-2.5 text-xs font-extrabold text-indigo-700 transition hover:bg-indigo-100"
-            >
-              View All Complaints
-            </button>
-          </div>
-
-          <div className="p-4 sm:p-6">
-            {loading ? (
-              <div className="py-12 text-center">
-                <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-indigo-100 border-t-indigo-600"></div>
-
-                <p className="mt-3 text-sm font-medium text-slate-400">
-                  Loading your complaints...
-                </p>
-              </div>
-            ) : recentComplaints.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 py-12 text-center">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-xl text-indigo-600">
-                  +
-                </div>
-
-                <p className="mt-4 font-bold text-slate-700">
-                  No complaints yet
-                </p>
-
-                <p className="mt-1 text-sm text-slate-400">
-                  Your maintenance complaints will appear here.
-                </p>
-
-                <button
-                  type="button"
-                  onClick={goToReport}
-                  className="mt-5 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-700"
-                >
-                  Report Your First Problem
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {recentComplaints.map((complaint) => (
-                  <button
-                    type="button"
+                return (
+                  <article
                     key={complaint._id}
-                    onClick={() =>
-                      navigate(
-                        `/student/complaints?id=${complaint._id}`
-                      )
-                    }
-                    className={`group flex w-full flex-col gap-4 rounded-2xl border p-4 text-left transition sm:flex-row sm:items-center ${darkMode
-                      ? "border-slate-700 bg-slate-800 hover:border-indigo-500"
-                      : "border-slate-100 bg-slate-50 hover:border-indigo-200 hover:bg-white"
-                      }`}
+                    className={`group overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xs transition-all duration-200 hover:border-indigo-300 hover:shadow-md ${
+                      complaint.status === "Pending"
+                        ? "border-t-4 border-t-amber-400"
+                        : complaint.status === "Assigned"
+                        ? "border-t-4 border-t-blue-400"
+                        : complaint.status === "In Progress"
+                        ? "border-t-4 border-t-purple-400"
+                        : "border-t-4 border-t-emerald-400"
+                    }`}
                   >
-                    <div className="flex min-w-0 flex-1 items-center gap-4">
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-100 font-black text-indigo-600">
-                        {complaint.category?.charAt(0) || "C"}
+                    {/* Header bar */}
+                    <div className="p-5 sm:p-6">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex flex-wrap items-center gap-2.5">
+                          <span className="rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700 border border-indigo-100/60">
+                            {complaint.category || "Maintenance"}
+                          </span>
+                          <span className="text-xs font-semibold text-slate-400">
+                            #{complaint._id?.slice(-6)}
+                          </span>
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500">
+                            <MapPin className="h-3.5 w-3.5 text-indigo-600" />
+                            {complaint.block || "Main"} • Room {complaint.room || "—"}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${getPriorityBadge(
+                              complaint.priority
+                            )}`}
+                          >
+                            {complaint.priority || "Normal"} Priority
+                          </span>
+
+                          <span
+                            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${badge.pill}`}
+                          >
+                            <span className={`h-1.5 w-1.5 rounded-full ${badge.dot}`}></span>
+                            <BadgeIcon className="h-3.5 w-3.5" />
+                            {complaint.status || "Pending"}
+                          </span>
+                        </div>
                       </div>
 
-                      <div className="min-w-0">
-                        <p
-                          className={`truncate text-sm font-extrabold ${darkMode ? "text-white" : "text-slate-800"
-                            }`}
+                      {/* 4-column Meta Grid (matching Admin Dashboard) */}
+                      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                        {/* Location */}
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                            Location
+                          </p>
+                          <p className="mt-1 text-xs font-bold text-slate-800 flex items-center gap-1">
+                            <MapPin className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+                            <span>
+                              {complaint.block || "Main Block"}, Room {complaint.room || "—"}
+                            </span>
+                          </p>
+                          <p className="text-[11px] text-slate-400 mt-0.5">
+                            {complaint.floor ? `Floor ${complaint.floor}` : "Medi-Caps Campus"}
+                          </p>
+                        </div>
+
+                        {/* Student (You) */}
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                            Reported By
+                          </p>
+                          <p className="mt-1 text-xs font-bold text-slate-800 flex items-center gap-1 truncate">
+                            <GraduationCap className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+                            <span>{user?.name || "You"}</span>
+                          </p>
+                          <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                            {user?.enrollmentNumber || user?.email || "Student Account"}
+                          </p>
+                        </div>
+
+                        {/* Supervisor Status */}
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                            Assigned Staff
+                          </p>
+                          <p className="mt-1 text-xs font-bold text-slate-800 flex items-center gap-1">
+                            <UserCheck className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+                            <span>
+                              {complaint.supervisor?.name ||
+                                (typeof complaint.supervisor === "string"
+                                  ? "Assigned"
+                                  : "Awaiting supervisor")}
+                            </span>
+                          </p>
+                          <p className="text-[11px] text-slate-400 mt-0.5">
+                            {complaint.technician?.name
+                              ? `Tech: ${complaint.technician.name}`
+                              : "Central Operations"}
+                          </p>
+                        </div>
+
+                        {/* Urgency */}
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                            Urgency / Raised
+                          </p>
+                          <p className="mt-1 text-xs font-bold text-slate-800 flex items-center gap-1">
+                            <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                            <span>{complaint.priority || "Normal"} Level</span>
+                          </p>
+                          <p className="text-[11px] text-slate-400 mt-0.5">
+                            {formatDate(complaint.createdAt)}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Problem Description */}
+                      <div className="mt-4">
+                        <p className="text-xs font-medium text-slate-600 line-clamp-2">
+                          {complaint.description || "No description provided."}
+                        </p>
+                      </div>
+
+                      {/* Expand / Collapse Button */}
+                      <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+                        <span className="text-[11px] font-semibold text-slate-400">
+                          Filed on {formatDateTime(complaint.createdAt)}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => toggleComplaint(complaint._id)}
+                          className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-700"
                         >
-                          {complaint.category ||
-                            "Maintenance Complaint"}
-                        </p>
-
-                        <p className="mt-1 truncate text-xs text-slate-400">
-                          {complaint.block || "—"} • Room{" "}
-                          {complaint.room || "—"} •{" "}
-                          {formatDate(complaint.createdAt)}
-                        </p>
+                          {isExpanded ? (
+                            <>
+                              <span>Show Less</span>
+                              <ChevronUp className="h-3.5 w-3.5" />
+                            </>
+                          ) : (
+                            <>
+                              <span>Read More</span>
+                              <ChevronDown className="h-3.5 w-3.5" />
+                            </>
+                          )}
+                        </button>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`rounded-full border px-3 py-1.5 text-[11px] font-bold ${getPriorityStyle(
-                          complaint.priority
-                        )}`}
-                      >
-                        {complaint.priority || "Low"}
-                      </span>
+                    {/* ================= EXPANDED DETAILS (MATCHING ADMIN DASHBOARD) ================= */}
+                    {isExpanded && (
+                      <div className="border-t border-slate-200/80 bg-slate-50/50 p-5 sm:p-6 space-y-5">
+                        {/* Full Description */}
+                        <div>
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                            Full Problem Description
+                          </h4>
+                          <p className="mt-1 text-xs leading-relaxed text-slate-700 rounded-xl bg-white p-3.5 border border-slate-200/80">
+                            {complaint.description || "No description provided."}
+                          </p>
+                        </div>
 
-                      <span
-                        className={`rounded-full border px-3 py-1.5 text-[11px] font-bold ${getStatusStyle(
-                          complaint.status
-                        )}`}
-                      >
-                        {complaint.status || "Pending"}
-                      </span>
+                        {/* Audit Trail Timeline */}
+                        <div>
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                            Resolution Timeline Trail
+                          </h4>
+                          <div className="mt-2 grid gap-3 sm:grid-cols-3">
+                            <div className="rounded-xl border border-slate-200/80 bg-white p-3">
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                01. Complaint Raised
+                              </p>
+                              <p className="mt-1 text-xs font-bold text-slate-800">
+                                {formatDateTime(complaint.createdAt)}
+                              </p>
+                              <p className="text-[10px] text-emerald-600 font-medium mt-0.5">
+                                ✓ Verified by Student
+                              </p>
+                            </div>
 
-                      <span className="ml-1 text-slate-300 transition group-hover:text-indigo-500">
-                        →
-                      </span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+                            <div className="rounded-xl border border-slate-200/80 bg-white p-3">
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                02. Supervisor Review
+                              </p>
+                              <p className="mt-1 text-xs font-bold text-slate-800">
+                                {complaint.assignedAt
+                                  ? formatDateTime(complaint.assignedAt)
+                                  : "Awaiting Allocation"}
+                              </p>
+                              <p className="text-[10px] text-slate-400 font-medium mt-0.5">
+                                {complaint.supervisor?.name
+                                  ? `Assigned to ${complaint.supervisor.name}`
+                                  : "Pending supervisor assignment"}
+                              </p>
+                            </div>
+
+                            <div className="rounded-xl border border-slate-200/80 bg-white p-3">
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                03. Resolution Complete
+                              </p>
+                              <p className="mt-1 text-xs font-bold text-slate-800">
+                                {complaint.resolvedAt
+                                  ? formatDateTime(complaint.resolvedAt)
+                                  : "In Progress"}
+                              </p>
+                              <p className="text-[10px] text-slate-400 font-medium mt-0.5">
+                                {complaint.status === "Resolved"
+                                  ? "✓ Work completed on site"
+                                  : "Repair underway"}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Photos Section */}
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          {/* Student Problem Photo */}
+                          <div>
+                            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                              Reported Problem Photo
+                            </p>
+                            {complaint.image ? (
+                              <img
+                                src={complaint.image}
+                                alt="Problem proof"
+                                className="h-48 w-full rounded-xl object-cover border border-slate-200 shadow-2xs"
+                              />
+                            ) : (
+                              <div className="flex h-48 w-full flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white text-slate-400">
+                                <Camera className="h-6 w-6 text-slate-300" />
+                                <span className="mt-1 text-xs">No photo attached</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Completion Proof Photo */}
+                          <div>
+                            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                              Technician Completion Proof
+                            </p>
+                            {complaint.completionImage ? (
+                              <img
+                                src={complaint.completionImage}
+                                alt="Completion proof"
+                                className="h-48 w-full rounded-xl object-cover border border-slate-200 shadow-2xs"
+                              />
+                            ) : (
+                              <div className="flex h-48 w-full flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white text-slate-400">
+                                <Wrench className="h-6 w-6 text-slate-300" />
+                                <span className="mt-1 text-xs">Proof not uploaded yet</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Quick Action Footer */}
+                        <div className="flex items-center justify-end pt-2">
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/student/complaints?id=${complaint._id}`)}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-indigo-700"
+                          >
+                            <span>Open Detailed View</span>
+                            <ArrowRight className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          )}
         </section>
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          <div
-            className={`rounded-3xl border p-6 shadow-sm ${darkMode
-              ? "border-slate-700 bg-slate-900"
-              : "border-slate-200 bg-white"
-              }`}
-          >
-            <div className="flex items-start gap-4">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-xl text-indigo-600">
-                ♡
+        {/* ================= BEST PRACTICE TIPS (MATCHING ADMIN DASHBOARD) ================= */}
+        <section className="mb-8 grid gap-4 sm:grid-cols-2">
+          <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-5">
+            <div className="flex items-start gap-3.5">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-indigo-600 shadow-2xs border border-indigo-100">
+                <Sparkles className="h-5 w-5" />
               </div>
-
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.14em] text-indigo-500">
-                  Campus Impact
-                </p>
-
-                <h3
-                  className={`mt-1 text-lg font-black ${darkMode ? "text-white" : "text-slate-900"
-                    }`}
-                >
-                  Your report helps improve campus
+                <h3 className="text-sm font-bold text-indigo-950">
+                  Campus Facilities Impact
                 </h3>
-
-                <p className="mt-2 text-sm leading-6 text-slate-400">
-                  Every genuine complaint helps the maintenance team
-                  identify and resolve issues faster.
+                <p className="mt-1 text-xs leading-relaxed text-indigo-900/80">
+                  Every accurate maintenance report enables rapid dispatch of technicians, preserving laboratories, lecture theatres, and campus amenities.
                 </p>
               </div>
             </div>
           </div>
 
-          <div
-            className={`rounded-3xl border p-6 shadow-sm ${darkMode
-              ? "border-slate-700 bg-slate-900"
-              : "border-slate-200 bg-white"
-              }`}
-          >
-            <div className="flex items-start gap-4">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-xl text-amber-600">
-                !
+          <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-5">
+            <div className="flex items-start gap-3.5">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-amber-600 shadow-2xs border border-amber-100">
+                <Lightbulb className="h-5 w-5" />
               </div>
-
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.14em] text-amber-500">
-                  CampusFix Tip
-                </p>
-
-                <h3
-                  className={`mt-1 text-lg font-black ${darkMode ? "text-white" : "text-slate-900"
-                    }`}
-                >
-                  Give an exact location
+                <h3 className="text-sm font-bold text-amber-950">
+                  Quick Resolution Tip
                 </h3>
-
-                <p className="mt-2 text-sm leading-6 text-slate-400">
-                  Always mention your block, room number and a clear
-                  description so the technician can find the issue quickly.
+                <p className="mt-1 text-xs leading-relaxed text-amber-900/80">
+                  Always provide the exact block, room number, and attach a clear photo. This ensures technicians arrive with the correct tools on the first trip.
                 </p>
               </div>
             </div>
           </div>
-        </div>
+        </section>
       </div>
     );
   };
 
+  /* ------------------------------------------------------------------ */
+  /* CONTENT DISPATCHER                                                 */
+  /* ------------------------------------------------------------------ */
   const renderContent = () => {
-    /*
-     * Route-based pages stay inside StudentDashboard,
-     * so sidebar + navbar never disappear.
-     */
     if (location.pathname === "/student/report") {
-      return <ComplaintForm />;
+      return <ComplaintForm isEmbedded={true} />;
     }
 
     if (location.pathname === "/student/complaints") {
-      return <MyComplaints />;
+      return <MyComplaints isEmbedded={true} />;
     }
 
     if (currentSection === "profile") {
@@ -1175,218 +1170,67 @@ function StudentDashboard() {
     }
 
     if (currentSection === "chatbot") {
-      return <CampusFixChatbot darkMode={darkMode} />
+      return <CampusFixChatbot />;
     }
 
     return renderDashboard();
   };
 
   return (
-    <div
-      className={`min-h-screen transition-colors duration-200 ${darkMode ? "bg-slate-950" : "bg-slate-50"
-        }`}
-    >
-      {/* Mobile Overlay */}
-      {sidebarOpen && (
-        <button
-          type="button"
-          aria-label="Close sidebar"
-          onClick={() => setSidebarOpen(false)}
-          className="fixed inset-0 z-30 bg-slate-900/20 backdrop-blur-[1px] lg:hidden"
-        ></button>
-      )}
+    <div className="min-h-screen bg-slate-50/60 font-sans text-slate-800">
+      {/* ================= STUDENT SIDEBAR ================= */}
+      <StudentSidebar
+        onLogout={() => setShowLogout(true)}
+        isOpen={sidebarOpen}
+        setIsOpen={setSidebarOpen}
+      />
 
-      {/* Sidebar */}
-      <aside
-        className={`fixed left-0 top-0 z-40 h-screen w-[250px] border-r transition-transform duration-300 ${darkMode
-          ? "border-slate-800 bg-slate-950"
-          : "border-slate-200 bg-white"
-          } ${sidebarOpen ? "translate-x-0" : "-translate-x-full"
-          }`}
-      >
-        <div className="flex h-full flex-col">
-          {/* Sidebar Header */}
-          <div
-            className={`flex h-20 items-center border-b px-5 ${darkMode
-              ? "border-slate-800"
-              : "border-slate-100"
-              }`}
-          >
-            <div>
-              <p
-                className={`text-xl font-black ${darkMode ? "text-white" : "text-slate-900"
-                  }`}
-              >
-                CampusFix
-              </p>
-
-              <p className="mt-0.5 text-[13px] font-extrabold uppercase tracking-[0.16em] text-slate-400">
-                Student Portal
-              </p>
-            </div>
-          </div>
-
-          {/* Navigation */}
-          <nav className="flex-1 overflow-y-auto px-3 py-5">
-            <p className="mb-3 px-3 text-[12px] font-black uppercase tracking-[0.18em] text-slate-400">
-              Student Menu
-            </p>
-
-            <div className="space-y-1.5">
-              {menuItems.map((item) => (
-                <button
-                  type="button"
-                  key={item.id}
-                  onClick={() => handleMenuClick(item)}
-                  className={`group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition ${currentSection === item.id
-                    ? darkMode
-                      ? "bg-indigo-600 text-white"
-                      : "bg-indigo-50 text-indigo-700"
-                    : darkMode
-                      ? "text-slate-400 hover:bg-slate-900 hover:text-white"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-indigo-600"
-                    }`}
-                >
-                  <span
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-base font-black ${currentSection === item.id
-                      ? darkMode
-                        ? "bg-white/15 text-white"
-                        : "bg-white text-indigo-600 shadow-sm"
-                      : darkMode
-                        ? "bg-slate-900 text-slate-400"
-                        : "bg-slate-50 text-slate-500 group-hover:bg-indigo-50 group-hover:text-indigo-600"
-                      }`}
-                  >
-                    {item.icon}
-                  </span>
-
-                  <span className="text-sm font-bold">
-                    {item.label}
-                  </span>
-
-                  {currentSection === item.id && (
-                    <span className="ml-auto h-1.5 w-1.5 rounded-full bg-current"></span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </nav>
-
-          {/* Sidebar Bottom */}
-          <div
-            className={`border-t p-3 ${darkMode
-              ? "border-slate-800"
-              : "border-slate-100"
-              }`}
-          >
-            <button
-              type="button"
-              onClick={() => setDarkMode(!darkMode)}
-              className={`mb-2 flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition ${darkMode
-                ? "text-slate-300 hover:bg-slate-900"
-                : "text-slate-600 hover:bg-slate-50"
-                }`}
-            >
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-base">
-                {darkMode ? "☀" : "☾"}
-              </span>
-
-              <span className="text-lg font-bold">
-                {darkMode ? "Light Mode" : "Dark Mode"}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setShowLogout(true)}
-              className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-slate-600 transition hover:bg-red-50 hover:text-red-600"
-            >
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-50 text-base">
-                ↪
-              </span>
-
-              <span className="text-lg font-bold">
-                Logout
-              </span>
-            </button>
-          </div>
-        </div>
-      </aside>
-
-      {/* Main Area */}
       <div
-        className={`min-h-screen transition-all duration-300 ${sidebarOpen ? "lg:pl-[250px]" : "lg:pl-0"
-          }`}
+        className={`transition-all duration-300 ${
+          sidebarOpen ? "lg:ml-64" : "lg:ml-20"
+        }`}
       >
-        {/* Top Navbar */}
-        <header
-          className={`sticky top-0 z-20 border-b backdrop-blur-md ${darkMode
-            ? "border-slate-800 bg-slate-950/95"
-            : "border-slate-200 bg-white/95"
-            }`}
-        >
-          <div className="flex min-h-[88px] items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
-            <div className="flex min-w-0 items-center gap-4">
-              {/* Sidebar Toggle */}
-              <button
-                type="button"
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                aria-label={
-                  sidebarOpen
-                    ? "Close sidebar"
-                    : "Open sidebar"
-                }
-                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border text-xl font-black transition ${darkMode
-                  ? "border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
-                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                  }`}
-              >
-                {sidebarOpen ? "‹" : "☰"}
-              </button>
+        {/* ================= TOP NAVBAR (MATCHING ADMIN DASHBOARD) ================= */}
+        <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur-md">
+          <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3.5">
+            <div className="flex items-center gap-4">
+              <img
+                src="https://www.medicaps.ac.in/public/frontend/images/medicaps-logo-fin.webp"
+                alt="Medi-Caps University Logo"
+                className="h-10 w-auto object-contain"
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                  e.currentTarget.parentElement.innerHTML =
+                    '<span class="font-black text-indigo-600 text-sm">MEDICAPS</span>';
+                }}
+              />
 
-              {/* Medi-Caps Logo */}
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-14 shrink-0 items-center rounded-xl bg-white px-3 shadow-sm ring-1 ring-slate-100">
-                  <img
-                    src="https://www.medicaps.ac.in/public/frontend/images/medicaps-logo-fin.webp"
-                    alt="Medi-Caps University"
-                    className="h-11 w-auto object-contain"
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none";
-                      e.currentTarget.parentElement.innerHTML =
-                        '<span class="font-black text-indigo-600">M</span>';
-                    }}
-                  />
-                </div>
+              <div className="hidden h-6 w-px bg-slate-200 sm:block" />
 
-
+              <div className="hidden sm:block">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700">
+                  <Sparkles className="h-3 w-3 text-indigo-600" />
+                  Student Maintenance Portal • Medi-Caps University
+                </span>
               </div>
             </div>
 
-            <div className="flex shrink-0 items-center gap-3">
-              <div className="hidden text-right sm:block">
-                <p
-                  className={`text-xl font-bold ${darkMode
-                    ? "text-white"
-                    : "text-slate-800"
-                    }`}
-                >
-                  {user.name || "Student"}
+            {/* Student Profile & Actions */}
+            <div className="flex items-center gap-3.5">
+              <div className="hidden text-right md:block">
+                <p className="text-sm font-bold text-slate-800 leading-tight">
+                  {user?.name || "Student"}
                 </p>
-
-                <p className="text-lg font-medium text-slate-400">
-                  Student Account
+                <p className="text-xs text-slate-500">
+                  {user?.enrollmentNumber || user?.email || "Student Account"}
                 </p>
               </div>
 
               <button
                 type="button"
                 onClick={goToProfile}
-                className={`flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border font-black ${darkMode
-                  ? "border-slate-700 bg-slate-800 text-indigo-300"
-                  : "border-indigo-100 bg-indigo-50 text-indigo-600"
-                  }`}
-                title="My Profile"
+                className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-700 font-bold text-white shadow-sm shadow-indigo-500/20 transition hover:opacity-90"
+                title="View Profile"
               >
                 {profileImage ? (
                   <img
@@ -1395,38 +1239,40 @@ function StudentDashboard() {
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  (user.name || "S").charAt(0).toUpperCase()
+                  (user?.name || "S").charAt(0).toUpperCase()
                 )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowLogout(true)}
+                className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-2xs transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+              >
+                Sign Out
               </button>
             </div>
           </div>
         </header>
 
-        {/* Page Content */}
-        <main className="px-4 py-6 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-7xl">
-            {renderContent()}
-          </div>
+        {/* ================= MAIN CONTENT ================= */}
+        <main className="mx-auto max-w-7xl px-6 py-8">
+          {renderContent()}
         </main>
 
-        {/* Footer */}
-        <footer
-          className={`border-t px-4 py-6 sm:px-6 lg:px-8 ${darkMode
-            ? "border-slate-800"
-            : "border-slate-200"
-            }`}
-        >
-          <div className="mx-auto flex max-w-7xl flex-col gap-2 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
-            <p className="text-xs font-medium text-slate-400">
+        {/* ================= FOOTER ================= */}
+        <footer className="border-t border-slate-200/80 bg-white py-6">
+          <div className="mx-auto max-w-7xl px-6 flex flex-col gap-2 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
+            <p className="text-xs font-medium text-slate-500">
               © {new Date().getFullYear()} CampusFix • Medi-Caps University
             </p>
-
             <p className="text-xs font-medium text-slate-400">
-              Campus Maintenance Management System
+              Institutional Maintenance Management System
             </p>
           </div>
         </footer>
       </div>
+
+      {/* ================= LOGOUT MODAL ================= */}
       {showLogout && (
         <LogoutModal
           isOpen={showLogout}

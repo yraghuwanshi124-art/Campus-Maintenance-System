@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import api from "../services/api";
 import { useNavigate } from "react-router-dom";
 
-function MyComplaints() {
+function MyComplaints({ isEmbedded = false }) {
   const navigate = useNavigate();
   const [complaints, setComplaints] = useState([]);
   const [expandedComplaints, setExpandedComplaints] = useState({});
@@ -184,53 +184,46 @@ function MyComplaints() {
   ).length;
   console.log("RENDER COMPLAINT COUNT:", complaints.length);
   return (
-    <div className="min-h-screen bg-slate-50">
-
+    <div className={isEmbedded ? "" : "min-h-screen bg-slate-50"}>
       {/* ================= NAVBAR ================= */}
-      <nav className="border-b border-indigo-100 bg-indigo-50 shadow-sm">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+      {!isEmbedded && (
+        <nav className="border-b border-indigo-100 bg-indigo-50 shadow-sm">
+          <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+            <div className="flex items-center gap-5">
+              <div className="rounded-xl bg-white px-3 py-1.5 shadow-sm">
+                <img
+                  src="https://www.medicaps.ac.in/public/frontend/images/medicaps-logo-fin.webp"
+                  alt="Medi-Caps University"
+                  className="h-11 w-auto object-contain"
+                />
+              </div>
 
-          <div className="flex items-center gap-5">
+              <div className="hidden border-l-2 border-indigo-200 pl-5 sm:block">
+                <p className="text-xl font-extrabold tracking-tight text-indigo-700">
+                  CampusFix
+                </p>
 
-            <div className="rounded-xl bg-white px-3 py-1.5 shadow-sm">
-              <img
-                src="https://www.medicaps.ac.in/public/frontend/images/medicaps-logo-fin.webp"
-                alt="Medi-Caps University"
-                className="h-11 w-auto object-contain"
-              />
+                <p className="mt-1 text-sm font-medium text-slate-600">
+                  Campus Maintenance Management System
+                </p>
+              </div>
             </div>
 
-            <div className="hidden border-l-2 border-indigo-200 pl-5 sm:block">
-
-              <p className="text-xl font-extrabold tracking-tight text-indigo-700">
-                CampusFix
-              </p>
-
-              <p className="mt-1 text-sm font-medium text-slate-600">
-                Campus Maintenance Management System
-              </p>
-
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => navigate("/student")}
+                className="rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-indigo-600 shadow-sm transition hover:bg-indigo-100"
+              >
+                ← Dashboard
+              </button>
             </div>
-
           </div>
-
-          <div className="flex items-center gap-3">
-
-            <button
-              onClick={() => navigate("/student")}
-              className="rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-indigo-600 shadow-sm transition hover:bg-indigo-100"
-            >
-              ← Dashboard
-            </button>
-
-          </div>
-
-        </div>
-      </nav>
-
+        </nav>
+      )}
 
       {/* ================= MAIN ================= */}
-      <main className="mx-auto max-w-7xl px-6 py-10">
+      <main className={isEmbedded ? "mx-auto max-w-7xl" : "mx-auto max-w-7xl px-6 py-10"}>
 
         {/* ================= HEADER ================= */}
         <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
