@@ -51,6 +51,22 @@ app.get("/", (req, res) => {
   res.send("College Maintenance Server is running!");
 });
 
+app.get("/api/health", (req, res) => {
+  const dbState = mongoose.connection.readyState;
+  const states = {
+    0: "disconnected",
+    1: "connected",
+    2: "connecting",
+    3: "disconnecting",
+  };
+  res.json({
+    status: "ok",
+    database: states[dbState] || "unknown",
+    readyState: dbState,
+    hasMongoUri: Boolean(process.env.MONGO_URI),
+  });
+});
+
 app.use("/api/auth", authRoutes);
 app.use("/api/complaints", complaintRoutes);
 app.use("/api/technicians", technicianRoutes);

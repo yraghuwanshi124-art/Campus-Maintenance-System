@@ -1,83 +1,20 @@
-
-
-// import axios from "axios";
-
-// const api = axios.create({
-//   baseURL: "https://campus-maintainace-system-vhie.vercel.app/api",
-// });
-
-// export default api;
-
-// import axios from "axios";
-
-// const api = axios.create({
-//   baseURL: "http://localhost:5000/api",
-// });
-
-// export default api;
-
-
-
-// import axios from "axios";
-
-// const api = axios.create({
-//   // baseURL: "http://localhost:5000/api",
-//   // baseURL: "https://campus-maintainace-system-vhie.vercel.app/api",
-//   baseURL: "https://campus-maintainace-system.onrender.com",
-// });
-
-// // Attach JWT token to every protected request
-// api.interceptors.request.use(
-//   (config) => {
-//     const token = localStorage.getItem("token");
-
-//     if (token) {
-//       config.headers.Authorization = `Bearer ${token}`;
-//     }
-
-//     return config;
-//   },
-//   (error) => {
-//     return Promise.reject(error);
-//   }
-// );
-
-// export default api;
-
-
-
-// import axios from "axios";
-
-// const api = axios.create({
-//   baseURL: "http://localhost:5000/api",
-//   baseURL: "https://campus-maintainace-system-1.onrender.com/api",
-
-// });
-
-// // Attach JWT token to every protected request
-// api.interceptors.request.use(
-//   (config) => {
-//     const token = localStorage.getItem("token");
-
-//     if (token) {
-//       config.headers.Authorization = `Bearer ${token}`;
-//     }
-
-//     return config;
-//   },
-//   (error) => {
-//     return Promise.reject(error);
-//   }
-// );
-
-// export default api;
-
-
-
 import axios from "axios";
 
+// Automatically resolve the backend API URL
+let rawBaseUrl =
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.PROD
+    ? "https://campus-maintenance-backend.onrender.com/api"
+    : "http://localhost:5000/api");
+
+// Normalize: ensure it doesn't have trailing slashes and always ends with /api
+let apiBaseUrl = rawBaseUrl.trim().replace(/\/+$/, "");
+if (!apiBaseUrl.endsWith("/api")) {
+  apiBaseUrl += "/api";
+}
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api",
+  baseURL: apiBaseUrl,
 });
 
 // Attach JWT token to every protected request
