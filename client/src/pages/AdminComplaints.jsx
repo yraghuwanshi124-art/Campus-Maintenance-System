@@ -3,8 +3,10 @@ import { useEffect, useState } from "react";
 import api from "../services/api";
 import LogoutModal from "../components/LogoutModal";
 import AdminSidebar from "../components/AdminSidebar";
+import { useTheme } from "../context/ThemeContext";
 
 function AdminComplaints() {
+  const { darkMode } = useTheme();
   const [complaints, setComplaints] = useState([]);
   const [supervisors, setSupervisors] = useState([]);
   const [showLogout, setShowLogout] = useState(false);
@@ -115,15 +117,15 @@ function AdminComplaints() {
         prevComplaints.map((complaint) =>
           complaint._id === complaintId
             ? {
-                ...complaint,
-                supervisor:
-                  assignedSupervisor || supervisorId,
-                technician: null,
-                status: "Assigned",
-                assignedAt:
-                  response.data.complaint?.assignedAt ||
-                  new Date().toISOString(),
-              }
+              ...complaint,
+              supervisor:
+                assignedSupervisor || supervisorId,
+              technician: null,
+              status: "Assigned",
+              assignedAt:
+                response.data.complaint?.assignedAt ||
+                new Date().toISOString(),
+            }
             : complaint
         )
       );
@@ -136,7 +138,7 @@ function AdminComplaints() {
     } catch (error) {
       alert(
         error.response?.data?.message ||
-          "Failed to assign complaint"
+        "Failed to assign complaint"
       );
     }
   };
@@ -185,7 +187,7 @@ function AdminComplaints() {
     } catch (error) {
       alert(
         error.response?.data?.message ||
-          "Failed to delete complaint"
+        "Failed to delete complaint"
       );
     }
   };
@@ -194,32 +196,32 @@ function AdminComplaints() {
 
   const getStatusStyle = (status) => {
     if (status === "Resolved") {
-      return "border-emerald-100 bg-emerald-50 text-emerald-700";
+      return "border-emerald-100 bg-emerald-50 text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/50 dark:text-emerald-300";
     }
 
     if (status === "In Progress") {
-      return "border-purple-100 bg-purple-50 text-purple-700";
+      return "border-purple-100 bg-purple-50 text-purple-700 dark:border-purple-800/60 dark:bg-purple-950/50 dark:text-purple-300";
     }
 
     if (status === "Assigned") {
-      return "border-orange-100 bg-orange-50 text-orange-700";
+      return "border-orange-100 bg-orange-50 text-orange-700 dark:border-orange-800/60 dark:bg-orange-950/50 dark:text-orange-300";
     }
 
-    return "border-blue-100 bg-blue-50 text-blue-700";
+    return "border-blue-100 bg-blue-50 text-blue-700 dark:border-blue-800/60 dark:bg-blue-950/50 dark:text-blue-300";
   };
 
   // ================= PRIORITY STYLE =================
 
   const getPriorityStyle = (priority) => {
     if (priority === "High") {
-      return "border-red-100 bg-red-50 text-red-600";
+      return "border-red-100 bg-red-50 text-red-600 dark:border-red-800/60 dark:bg-red-950/50 dark:text-red-300";
     }
 
     if (priority === "Medium") {
-      return "border-orange-100 bg-orange-50 text-orange-600";
+      return "border-orange-100 bg-orange-50 text-orange-600 dark:border-orange-800/60 dark:bg-orange-950/50 dark:text-orange-300";
     }
 
-    return "border-emerald-100 bg-emerald-50 text-emerald-600";
+    return "border-emerald-100 bg-emerald-50 text-emerald-600 dark:border-emerald-800/60 dark:bg-emerald-950/50 dark:text-emerald-300";
   };
 
   // ================= DATE FORMAT =================
@@ -248,10 +250,10 @@ function AdminComplaints() {
         typeof complaint.supervisor === "object"
           ? complaint.supervisor?.name || ""
           : supervisors.find(
-              (supervisor) =>
-                supervisor._id ===
-                complaint.supervisor
-            )?.name || "";
+            (supervisor) =>
+              supervisor._id ===
+              complaint.supervisor
+          )?.name || "";
 
       const matchesSearch =
         complaint.category
@@ -329,7 +331,7 @@ function AdminComplaints() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-200">
       {/* ================= SIDEBAR ================= */}
 
       <AdminSidebar
@@ -339,10 +341,10 @@ function AdminComplaints() {
       <div className="lg:ml-64">
         {/* ================= NAVBAR ================= */}
 
-        <nav className="border-b border-indigo-100 bg-indigo-50 shadow-sm">
+        <nav className="border-b border-indigo-100 bg-indigo-50 shadow-sm dark:border-slate-800 dark:bg-slate-900/90">
           <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
             <div className="flex items-center gap-5">
-              <div className="rounded-xl bg-white px-3 py-1.5 shadow-sm">
+              <div className="rounded-xl bg-white px-3 py-1.5 shadow-sm dark:border dark:border-slate-700 dark:bg-slate-800">
                 <img
                   src="https://www.medicaps.ac.in/public/frontend/images/medicaps-logo-fin.webp"
                   alt="Medi-Caps University"
@@ -350,12 +352,12 @@ function AdminComplaints() {
                 />
               </div>
 
-              <div className="hidden border-l-2 border-indigo-200 pl-5 sm:block">
-                <p className="text-xl font-extrabold tracking-tight text-indigo-700">
+              <div className="hidden border-l-2 border-indigo-200 pl-5 sm:block dark:border-indigo-800">
+                <p className="text-xl font-extrabold tracking-tight text-indigo-700 dark:text-indigo-400">
                   CampusFix
                 </p>
 
-                <p className="mt-1 text-sm font-medium text-slate-600">
+                <p className="mt-1 text-sm font-medium text-slate-600 dark:text-slate-400">
                   Campus Maintenance Management System
                 </p>
               </div>
@@ -363,15 +365,15 @@ function AdminComplaints() {
 
             <div className="flex items-center gap-4">
               <div className="hidden text-right sm:block">
-                <p className="text-base font-bold text-slate-800">
+                <p className="text-base font-bold text-slate-800 dark:text-white">
                   {user?.assignedBlocks?.length
                     ? `${user.assignedBlocks.join(
-                        ", "
-                      )} Admin`
+                      ", "
+                    )} Admin`
                     : "Administrator"}
                 </p>
 
-                <p className="mt-0.5 max-w-[230px] truncate text-sm text-slate-500">
+                <p className="mt-0.5 max-w-[230px] truncate text-sm text-slate-500 dark:text-slate-400">
                   {user?.email || "No email"}
                 </p>
               </div>
@@ -382,7 +384,7 @@ function AdminComplaints() {
 
               <button
                 onClick={() => setShowLogout(true)}
-                className="rounded-xl border border-indigo-200 bg-white px-5 py-2.5 text-base font-semibold text-slate-700 shadow-sm transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+                className="rounded-xl border border-indigo-200 bg-white px-5 py-2.5 text-base font-semibold text-slate-700 shadow-sm transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
               >
                 Logout
               </button>
@@ -395,7 +397,7 @@ function AdminComplaints() {
         <main className="mx-auto max-w-7xl px-6 py-10">
           {/* ================= HEADER ================= */}
 
-          <div className="mb-8 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+          <div className="mb-8 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="bg-gradient-to-r from-indigo-600 via-indigo-600 to-purple-700 p-6 sm:p-8">
               <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                 <div className="text-white">
@@ -414,7 +416,7 @@ function AdminComplaints() {
                 </div>
 
                 <div className="flex w-fit items-center gap-3 rounded-2xl border border-white/20 bg-white/10 px-5 py-4 backdrop-blur-md">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-xl">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-xl dark:bg-slate-800">
                     📋
                   </div>
 
@@ -433,7 +435,7 @@ function AdminComplaints() {
 
             {/* ================= SEARCH + FILTER ================= */}
 
-            <div className="border-b border-slate-100 bg-slate-50/70 p-5 sm:p-6">
+            <div className="border-b border-slate-100 bg-slate-50/70 p-5 sm:p-6 dark:border-slate-800 dark:bg-slate-900">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="relative w-full lg:max-w-xl">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg">
@@ -447,7 +449,10 @@ function AdminComplaints() {
                       setSearchTerm(e.target.value)
                     }
                     placeholder="Search by complaint, student, block, room..."
-                    className="w-full rounded-2xl border border-slate-200 bg-white py-3.5 pl-12 pr-4 text-sm font-medium text-slate-700 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                    className={`w-full rounded-2xl border py-3.5 pl-12 pr-4 text-sm font-medium shadow-sm outline-none transition ${darkMode
+                      ? "border-slate-700 bg-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-950"
+                      : "border-slate-200 bg-white text-slate-700 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                      }`}
                   />
                 </div>
 
@@ -467,11 +472,12 @@ function AdminComplaints() {
                       onClick={() =>
                         setStatusFilter(filter.name)
                       }
-                      className={`rounded-xl px-4 py-2.5 text-xs font-bold transition ${
-                        statusFilter === filter.name
-                          ? "bg-indigo-600 text-white shadow-md"
+                      className={`rounded-xl px-4 py-2.5 text-xs font-bold transition ${statusFilter === filter.name
+                        ? "bg-indigo-600 text-white shadow-md"
+                        : darkMode
+                          ? "border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700"
                           : "border border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-600"
-                      }`}
+                        }`}
                     >
                       {filter.icon} {filter.name}
                     </button>
@@ -479,14 +485,14 @@ function AdminComplaints() {
                 </div>
               </div>
 
-              <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
-                <p className="text-sm font-medium text-slate-500">
+              <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4 dark:border-slate-800">
+                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
                   Showing{" "}
-                  <span className="font-extrabold text-slate-800">
+                  <span className="font-extrabold text-slate-800 dark:text-white">
                     {sortedComplaints.length}
                   </span>{" "}
                   of{" "}
-                  <span className="font-extrabold text-slate-800">
+                  <span className="font-extrabold text-slate-800 dark:text-white">
                     {complaints.length}
                   </span>{" "}
                   complaints
@@ -494,16 +500,16 @@ function AdminComplaints() {
 
                 {(searchTerm ||
                   statusFilter !== "All") && (
-                  <button
-                    onClick={() => {
-                      setSearchTerm("");
-                      setStatusFilter("All");
-                    }}
-                    className="text-sm font-bold text-indigo-600 hover:text-indigo-700"
-                  >
-                    Clear Filters
-                  </button>
-                )}
+                    <button
+                      onClick={() => {
+                        setSearchTerm("");
+                        setStatusFilter("All");
+                      }}
+                      className="text-sm font-bold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+                    >
+                      Clear Filters
+                    </button>
+                  )}
               </div>
             </div>
           </div>
@@ -511,20 +517,28 @@ function AdminComplaints() {
           {/* ================= NO COMPLAINTS ================= */}
 
           {sortedComplaints.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-12 text-center shadow-sm">
-              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-indigo-50 text-4xl">
+            <div
+              className={`rounded-3xl border border-dashed p-12 text-center shadow-sm ${darkMode
+                ? "border-slate-800 bg-slate-900"
+                : "border-slate-300 bg-white"
+                }`}
+            >
+              <div
+                className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full text-4xl ${darkMode ? "bg-slate-800" : "bg-indigo-50"
+                  }`}
+              >
                 {searchTerm || statusFilter !== "All"
                   ? "🔎"
                   : "📋"}
               </div>
 
-              <h3 className="mt-5 text-xl font-bold text-slate-800">
+              <h3 className={`mt-5 text-xl font-bold ${darkMode ? "text-white" : "text-slate-800"}`}>
                 {searchTerm || statusFilter !== "All"
                   ? "No matching complaints"
                   : "No complaints found"}
               </h3>
 
-              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+              <p className={`mx-auto mt-2 max-w-md text-sm leading-6 ${darkMode ? "text-slate-400" : "text-slate-500"}`}>
                 {searchTerm || statusFilter !== "All"
                   ? "Try changing your search or status filter to find other complaints."
                   : "There are currently no maintenance complaints in the system."}
@@ -532,16 +546,16 @@ function AdminComplaints() {
 
               {(searchTerm ||
                 statusFilter !== "All") && (
-                <button
-                  onClick={() => {
-                    setSearchTerm("");
-                    setStatusFilter("All");
-                  }}
-                  className="mt-5 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700"
-                >
-                  Clear Filters
-                </button>
-              )}
+                  <button
+                    onClick={() => {
+                      setSearchTerm("");
+                      setStatusFilter("All");
+                    }}
+                    className="mt-5 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700"
+                  >
+                    Clear Filters
+                  </button>
+                )}
             </div>
           ) : (
             <div className="space-y-5">
@@ -551,16 +565,16 @@ function AdminComplaints() {
                 <div className="mb-8">
                   <div className="mb-4 flex items-center justify-between">
                     <div>
-                      <h2 className="text-xl font-extrabold text-slate-800">
+                      <h2 className="text-xl font-extrabold text-slate-800 dark:text-white">
                         🟡 Pending Complaints
                       </h2>
 
-                      <p className="text-sm text-slate-500">
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
                         Complaints waiting for supervisor assignment
                       </p>
                     </div>
 
-                    <span className="rounded-full bg-yellow-100 px-4 py-2 text-sm font-bold text-yellow-700">
+                    <span className="rounded-full bg-yellow-100 px-4 py-2 text-sm font-bold text-yellow-700 dark:bg-yellow-950/60 dark:text-yellow-400">
                       {pendingComplaintList.length}
                     </span>
                   </div>
@@ -572,16 +586,16 @@ function AdminComplaints() {
               {activeComplaints.length > 0 && (
                 <div className="mb-4 mt-10 flex items-center justify-between">
                   <div>
-                    <h2 className="text-xl font-extrabold text-slate-800">
+                    <h2 className="text-xl font-extrabold text-slate-800 dark:text-white">
                       🔵 Active Complaints
                     </h2>
 
-                    <p className="text-sm text-slate-500">
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
                       Assigned and currently in-progress complaints
                     </p>
                   </div>
 
-                  <span className="rounded-full bg-blue-100 px-4 py-2 text-sm font-bold text-blue-700">
+                  <span className="rounded-full bg-blue-100 px-4 py-2 text-sm font-bold text-blue-700 dark:bg-blue-950/60 dark:text-blue-400">
                     {activeComplaints.length}
                   </span>
                 </div>
@@ -592,20 +606,23 @@ function AdminComplaints() {
               {resolvedComplaintList.length > 0 && (
                 <div className="mb-4 mt-10 flex items-center justify-between">
                   <div>
-                    <h2 className="text-xl font-extrabold text-slate-800">
+                    <h2 className="text-xl font-extrabold text-slate-800 dark:text-white">
                       🟢 Resolved Complaints
                     </h2>
 
-                    <p className="text-sm text-slate-500">
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
                       Complaints successfully resolved by technicians
                     </p>
                   </div>
 
-                  <span className="rounded-full bg-emerald-100 px-4 py-2 text-sm font-bold text-emerald-700">
+                  <span className="rounded-full bg-emerald-100 px-4 py-2 text-sm font-bold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400">
                     {resolvedComplaintList.length}
                   </span>
                 </div>
               )}
+
+              {/* ================= COMPLAINT CARDS ================= */}
+
 
               {/* ================= COMPLAINT CARDS ================= */}
 
@@ -614,40 +631,34 @@ function AdminComplaints() {
                   expandedComplaints[complaint._id];
 
                 const supervisorId =
-                  typeof complaint.supervisor ===
-                  "object"
+                  typeof complaint.supervisor === "object"
                     ? complaint.supervisor?._id
                     : complaint.supervisor;
 
                 const supervisorName =
-                  typeof complaint.supervisor ===
-                  "object"
+                  typeof complaint.supervisor === "object"
                     ? complaint.supervisor?.name
                     : supervisors.find(
-                        (supervisor) =>
-                          supervisor._id ===
-                          supervisorId
-                      )?.name;
+                      (supervisor) =>
+                        supervisor._id === supervisorId
+                    )?.name;
 
                 return (
                   <div
                     key={complaint._id}
-                    className="group overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:border-indigo-200 hover:shadow-xl"
+                    className="group overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:border-indigo-200 hover:shadow-xl dark:border-slate-700 dark:bg-slate-900 dark:hover:border-indigo-500"
                   >
                     {/* TOP STATUS LINE */}
 
                     <div
-                      className={`h-1.5 ${
-                        complaint.status === "Resolved"
+                      className={`h-1.5 ${complaint.status === "Resolved"
                           ? "bg-emerald-500"
-                          : complaint.status ===
-                            "In Progress"
-                          ? "bg-purple-500"
-                          : complaint.status ===
-                            "Assigned"
-                          ? "bg-orange-500"
-                          : "bg-blue-500"
-                      }`}
+                          : complaint.status === "In Progress"
+                            ? "bg-purple-500"
+                            : complaint.status === "Assigned"
+                              ? "bg-orange-500"
+                              : "bg-blue-500"
+                        }`}
                     />
 
                     <div className="p-5 sm:p-6">
@@ -656,18 +667,14 @@ function AdminComplaints() {
                       <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                         <div className="flex gap-4">
                           <div
-                            className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-2xl ${
-                              complaint.status ===
-                              "Resolved"
-                                ? "bg-emerald-50"
-                                : complaint.status ===
-                                  "In Progress"
-                                ? "bg-purple-50"
-                                : complaint.status ===
-                                  "Assigned"
-                                ? "bg-orange-50"
-                                : "bg-indigo-50"
-                            }`}
+                            className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-2xl ${complaint.status === "Resolved"
+                                ? "bg-emerald-50 dark:bg-emerald-950/40"
+                                : complaint.status === "In Progress"
+                                  ? "bg-purple-50 dark:bg-purple-950/40"
+                                  : complaint.status === "Assigned"
+                                    ? "bg-orange-50 dark:bg-orange-950/40"
+                                    : "bg-indigo-50 dark:bg-indigo-950/40"
+                              }`}
                           >
                             🛠️
                           </div>
@@ -679,22 +686,18 @@ function AdminComplaints() {
                               </span>
 
                               <span className="text-xs text-slate-400">
-                                • #
-                                {complaint._id?.slice(
-                                  -6
-                                )}
+                                • #{complaint._id?.slice(-6)}
                               </span>
                             </div>
 
-                            <h3 className="mt-1 text-xl font-extrabold text-slate-800">
+                            <h3 className="mt-1 text-xl font-extrabold text-slate-800 dark:text-white">
                               {complaint.category}
                             </h3>
 
-                            <p className="mt-1 text-sm text-slate-500">
+                            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                               Reported by{" "}
-                              <span className="font-semibold text-slate-700">
-                                {complaint.user?.name ||
-                                  "Unknown Student"}
+                              <span className="font-semibold text-slate-700 dark:text-slate-200">
+                                {complaint.user?.name || "Unknown Student"}
                               </span>
                             </p>
                           </div>
@@ -708,18 +711,10 @@ function AdminComplaints() {
                               complaint.status
                             )}`}
                           >
-                            {complaint.status ===
-                              "Resolved" && "✓ "}
-
-                            {complaint.status ===
-                              "In Progress" && "⚙ "}
-
-                            {complaint.status ===
-                              "Assigned" && "👨‍💼 "}
-
-                            {complaint.status ===
-                              "Pending" && "⏳ "}
-
+                            {complaint.status === "Resolved" && "✓ "}
+                            {complaint.status === "In Progress" && "⚙ "}
+                            {complaint.status === "Assigned" && "👨‍💼 "}
+                            {complaint.status === "Pending" && "⏳ "}
                             {complaint.status}
                           </span>
 
@@ -728,8 +723,7 @@ function AdminComplaints() {
                               complaint.priority
                             )}`}
                           >
-                            ⚡{" "}
-                            {complaint.priority || "Low"}
+                            ⚡ {complaint.priority || "Low"}
                           </span>
                         </div>
                       </div>
@@ -741,97 +735,76 @@ function AdminComplaints() {
                           {/* INFO GRID */}
 
                           <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+
                             {/* LOCATION */}
 
-                            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800">
                               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-400">
-                                <span className="text-base">
-                                  📍
-                                </span>
+                                <span className="text-base">📍</span>
                                 Location
                               </div>
 
-                              <p className="mt-2 text-xl font-bold text-slate-700">
+                              <p className="mt-2 text-xl font-bold text-slate-700 dark:text-slate-100">
                                 {complaint.block || "—"}
                               </p>
 
-                              <p className="mt-0.5 font-semibold text-slate-500">
-                                Room{" "}
-                                {complaint.room || "—"}
+                              <p className="mt-0.5 font-semibold text-slate-500 dark:text-slate-400">
+                                Room {complaint.room || "—"}
                               </p>
                             </div>
 
                             {/* STUDENT */}
 
-                            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800">
                               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-400">
-                                <span className="text-base">
-                                  👨‍🎓
-                                </span>
+                                <span className="text-base">👨‍🎓</span>
                                 Student
                               </div>
 
-                              <p className="mt-2 truncate font-bold text-slate-700">
-                                {complaint.user?.name ||
-                                  "Unknown Student"}
+                              <p className="mt-2 truncate font-bold text-slate-700 dark:text-slate-100">
+                                {complaint.user?.name || "Unknown Student"}
                               </p>
 
-                              <p className="mt-1 truncate text-sm font-bold text-indigo-600">
-                                🎓{" "}
-                                {complaint.user
-                                  ?.enrollmentNumber ||
-                                  "No enrollment number"}
+                              <p className="mt-1 truncate text-sm font-bold text-indigo-600 dark:text-indigo-400">
+                                🎓 {complaint.user?.enrollmentNumber || "No enrollment number"}
                               </p>
 
-                              <p className="mt-1 truncate text-sm font-semibold text-slate-500">
-                                {complaint.user?.email ||
-                                  "No email"}
+                              <p className="mt-1 truncate text-sm font-semibold text-slate-500 dark:text-slate-400">
+                                {complaint.user?.email || "No email"}
                               </p>
 
                               {complaint.mobileNumber && (
-                                <p className="mt-1 truncate text-sm font-bold text-emerald-600">
-                                  📞{" "}
-                                  {
-                                    complaint.mobileNumber
-                                  }
+                                <p className="mt-1 truncate text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                                  📞 {complaint.mobileNumber}
                                 </p>
                               )}
 
-                              <p className="mt-1 text-sm font-semibold text-slate-500">
-                                {complaint.user
-                                  ?.department ||
-                                  "No department"}
+                              <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
+                                {complaint.user?.department || "No department"}
                                 {" • "}
-                                {complaint.user
-                                  ?.semester
+                                {complaint.user?.semester
                                   ? `Semester ${complaint.user.semester}`
                                   : "No semester"}
                               </p>
 
-                              <p className="mt-1 text-sm font-bold text-slate-600">
-                                🏫{" "}
-                                {complaint.user
-                                  ?.classSection ||
-                                  "No class"}
+                              <p className="mt-1 text-sm font-bold text-slate-600 dark:text-slate-300">
+                                🏫 {complaint.user?.classSection || "No class"}
                               </p>
                             </div>
 
                             {/* SUPERVISOR */}
 
-                            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800">
                               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-400">
-                                <span className="text-base">
-                                  👨‍💼
-                                </span>
+                                <span className="text-base">👨‍💼</span>
                                 Supervisor
                               </div>
 
-                              <p className="mt-2 truncate font-bold text-slate-700">
-                                {supervisorName ||
-                                  "Not assigned"}
+                              <p className="mt-2 truncate font-bold text-slate-700 dark:text-slate-100">
+                                {supervisorName || "Not assigned"}
                               </p>
 
-                              <p className="mt-0.5 font-semibold text-slate-500">
+                              <p className="mt-0.5 font-semibold text-slate-500 dark:text-slate-400">
                                 {supervisorId
                                   ? "Currently assigned"
                                   : "Waiting for assignment"}
@@ -840,20 +813,17 @@ function AdminComplaints() {
 
                             {/* PRIORITY */}
 
-                            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800">
                               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-400">
-                                <span className="text-base">
-                                  ⚡
-                                </span>
+                                <span className="text-base">⚡</span>
                                 Priority
                               </div>
 
-                              <p className="mt-2 font-extrabold text-slate-700">
-                                {complaint.priority ||
-                                  "Low"}
+                              <p className="mt-2 font-extrabold text-slate-700 dark:text-slate-100">
+                                {complaint.priority || "Low"}
                               </p>
 
-                              <p className="mt-0.5 font-semibold text-slate-500">
+                              <p className="mt-0.5 font-semibold text-slate-500 dark:text-slate-400">
                                 Maintenance priority
                               </p>
                             </div>
@@ -861,73 +831,66 @@ function AdminComplaints() {
 
                           {/* DESCRIPTION */}
 
-                          <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-5">
+                          <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-5 dark:border-slate-700 dark:bg-slate-800">
                             <div className="mb-2 flex items-center gap-2">
-                              <span className="text-base">
-                                📝
-                              </span>
+                              <span className="text-base">📝</span>
 
-                              <p className="text-sm font-bold uppercase tracking-wide text-slate-700">
+                              <p className="text-sm font-bold uppercase tracking-wide text-slate-700 dark:text-slate-200">
                                 Problem Description
                               </p>
                             </div>
 
-                            <p className="text-sm font-medium leading-7 text-slate-600">
-                              {complaint.description ||
-                                "No description provided."}
+                            <p className="text-sm font-medium leading-7 text-slate-600 dark:text-slate-300">
+                              {complaint.description || "No description provided."}
                             </p>
                           </div>
 
                           {/* TIMELINE */}
 
-                          <div className="mt-4 rounded-2xl border border-indigo-100 bg-indigo-50/40 p-5">
+                          <div className="mt-4 rounded-2xl border border-indigo-100 bg-indigo-50/40 p-5 dark:border-indigo-800 dark:bg-indigo-950/30">
                             <div className="mb-5 flex items-center gap-3">
-                              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-lg">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-lg dark:bg-indigo-900">
                                 🕒
                               </div>
 
                               <div>
-                                <p className="font-bold text-slate-800">
+                                <p className="font-bold text-slate-800 dark:text-white">
                                   Complaint Timeline
                                 </p>
 
-                                <p className="text-xs text-slate-500">
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
                                   Complete history of this maintenance request
                                 </p>
                               </div>
                             </div>
 
                             <div className="grid gap-3 md:grid-cols-3">
+
                               {/* RAISED */}
 
-                              <div className="rounded-xl bg-white p-4 shadow-sm">
+                              <div className="rounded-xl bg-white p-4 shadow-sm dark:bg-slate-800">
                                 <div className="flex items-center gap-2">
                                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-sm text-blue-600">
                                     ✓
                                   </div>
 
-                                  <p className="text-sm font-bold text-slate-800">
+                                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
                                     Complaint Raised
                                   </p>
                                 </div>
 
-                                <p className="mt-2 text-xs text-slate-500">
-                                  By{" "}
-                                  {complaint.user?.name ||
-                                    "Student"}
+                                <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                                  By {complaint.user?.name || "Student"}
                                 </p>
 
-                                <p className="mt-1 text-xs font-semibold text-blue-600">
-                                  🕒{" "}
-                                  {formatDateTime(
-                                    complaint.createdAt
-                                  )}
+                                <p className="mt-1 text-xs font-semibold text-blue-600 dark:text-blue-400">
+                                  🕒 {formatDateTime(complaint.createdAt)}
                                 </p>
                               </div>
 
                               {/* SUPERVISOR ASSIGNED */}
 
-                              <div className="rounded-xl bg-white p-4 shadow-sm">
+                              <div className="rounded-xl bg-white p-4 shadow-sm dark:bg-slate-800">
                                 {complaint.assignedAt ? (
                                   <>
                                     <div className="flex items-center gap-2">
@@ -935,30 +898,26 @@ function AdminComplaints() {
                                         ✓
                                       </div>
 
-                                      <p className="text-sm font-bold text-slate-800">
+                                      <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
                                         Supervisor Assigned
                                       </p>
                                     </div>
 
-                                    <p className="mt-2 text-xs text-slate-500">
+                                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
                                       Assigned to{" "}
-                                      <span className="font-bold text-orange-600">
-                                        {supervisorName ||
-                                          "Supervisor"}
+                                      <span className="font-bold text-orange-600 dark:text-orange-400">
+                                        {supervisorName || "Supervisor"}
                                       </span>
                                     </p>
 
-                                    <p className="mt-1 text-xs font-semibold text-orange-600">
-                                      🕒{" "}
-                                      {formatDateTime(
-                                        complaint.assignedAt
-                                      )}
+                                    <p className="mt-1 text-xs font-semibold text-orange-600 dark:text-orange-400">
+                                      🕒 {formatDateTime(complaint.assignedAt)}
                                     </p>
                                   </>
                                 ) : (
                                   <>
                                     <div className="flex items-center gap-2">
-                                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-sm text-slate-400">
+                                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-sm text-slate-400 dark:bg-slate-700">
                                         2
                                       </div>
 
@@ -980,7 +939,7 @@ function AdminComplaints() {
 
                               {/* RESOLVED */}
 
-                              <div className="rounded-xl bg-white p-4 shadow-sm">
+                              <div className="rounded-xl bg-white p-4 shadow-sm dark:bg-slate-800">
                                 {complaint.resolvedAt ? (
                                   <>
                                     <div className="flex items-center gap-2">
@@ -988,26 +947,23 @@ function AdminComplaints() {
                                         ✓
                                       </div>
 
-                                      <p className="text-sm font-bold text-slate-800">
+                                      <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
                                         Complaint Resolved
                                       </p>
                                     </div>
 
-                                    <p className="mt-2 text-xs text-slate-500">
+                                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
                                       Maintenance issue successfully resolved.
                                     </p>
 
-                                    <p className="mt-1 text-xs font-semibold text-emerald-600">
-                                      🕒{" "}
-                                      {formatDateTime(
-                                        complaint.resolvedAt
-                                      )}
+                                    <p className="mt-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                                      🕒 {formatDateTime(complaint.resolvedAt)}
                                     </p>
                                   </>
                                 ) : (
                                   <>
                                     <div className="flex items-center gap-2">
-                                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-sm text-slate-400">
+                                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-sm text-slate-400 dark:bg-slate-700">
                                         3
                                       </div>
 
@@ -1031,15 +987,15 @@ function AdminComplaints() {
 
                           {/* PHOTOS */}
 
-                          {(complaint.image ||
-                            complaint.completionImage) && (
+                          {(complaint.image || complaint.completionImage) && (
                             <div className="mt-4 grid gap-4 md:grid-cols-2">
+
                               {complaint.image && (
-                                <div className="overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                                <div className="overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800">
                                   <div className="mb-3 flex items-center gap-2">
                                     <span>📷</span>
 
-                                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-300">
                                       Problem Photo
                                     </p>
                                   </div>
@@ -1053,24 +1009,22 @@ function AdminComplaints() {
                               )}
 
                               {complaint.completionImage && (
-                                <div className="overflow-hidden rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+                                <div className="overflow-hidden rounded-2xl border border-emerald-100 bg-emerald-50 p-4 dark:border-emerald-800 dark:bg-emerald-950/30">
                                   <div className="mb-3 flex items-center gap-2">
                                     <span>✅</span>
 
-                                    <p className="text-xs font-bold uppercase tracking-wide text-emerald-600">
+                                    <p className="text-xs font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
                                       Completion Proof
                                     </p>
                                   </div>
 
                                   <img
-                                    src={
-                                      complaint.completionImage
-                                    }
+                                    src={complaint.completionImage}
                                     alt="Completed maintenance work"
                                     className="h-56 w-full rounded-xl object-cover"
                                   />
 
-                                  <p className="mt-2 text-xs font-semibold text-emerald-700">
+                                  <p className="mt-2 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
                                     ✓ Technician uploaded completion proof
                                   </p>
                                 </div>
@@ -1083,19 +1037,13 @@ function AdminComplaints() {
 
                     {/* ================= READ MORE ================= */}
 
-                    <div className="border-t border-slate-100 bg-slate-50/70 px-5 py-4 sm:px-6">
+                    <div className="border-t border-slate-100 bg-slate-50/70 px-5 py-4 sm:px-6 dark:border-slate-700 dark:bg-slate-900">
                       <button
                         type="button"
-                        onClick={() =>
-                          toggleComplaint(
-                            complaint._id
-                          )
-                        }
-                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-white px-5 py-3 text-sm font-bold text-indigo-600 shadow-sm transition hover:bg-indigo-50 hover:shadow-md"
+                        onClick={() => toggleComplaint(complaint._id)}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-white px-5 py-3 text-sm font-bold text-indigo-600 shadow-sm transition hover:bg-indigo-50 hover:shadow-md dark:border-slate-600 dark:bg-slate-800 dark:text-indigo-300 dark:hover:bg-slate-700"
                       >
-                        {isExpanded
-                          ? "Show Less"
-                          : "Read More"}
+                        {isExpanded ? "Show Less" : "Read More"}
 
                         <span className="text-base">
                           {isExpanded ? "↑" : "↓"}
@@ -1106,19 +1054,19 @@ function AdminComplaints() {
                     {/* ================= ACTION BAR ================= */}
 
                     {isExpanded && (
-                      <div className="border-t border-slate-100 bg-slate-50/80 px-5 py-5 sm:px-6">
+                      <div className="border-t border-slate-100 bg-slate-50/80 px-5 py-5 sm:px-6 dark:border-slate-700 dark:bg-slate-900">
                         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+
                           {/* SUPERVISOR ASSIGNMENT */}
 
-                          {complaint.status !==
-                          "Resolved" ? (
+                          {complaint.status !== "Resolved" ? (
                             <div className="flex-1">
                               <div className="mb-2 flex items-center gap-2">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100 dark:bg-indigo-900">
                                   👨‍💼
                                 </div>
 
-                                <p className="text-sm font-bold text-slate-700">
+                                <p className="text-sm font-bold text-slate-700 dark:text-slate-200">
                                   Supervisor Assignment
                                 </p>
                               </div>
@@ -1126,62 +1074,43 @@ function AdminComplaints() {
                               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                                 <select
                                   value={
-                                    selectedSupervisors[
-                                      complaint._id
-                                    ] ||
+                                    selectedSupervisors[complaint._id] ||
                                     supervisorId ||
                                     ""
                                   }
                                   onChange={(e) =>
-                                    setSelectedSupervisors(
-                                      (prev) => ({
-                                        ...prev,
-                                        [complaint._id]:
-                                          e.target.value,
-                                      })
-                                    )
+                                    setSelectedSupervisors((prev) => ({
+                                      ...prev,
+                                      [complaint._id]: e.target.value,
+                                    }))
                                   }
-                                  className="w-full max-w-xl rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                                  className="w-full max-w-xl rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-indigo-900"
                                 >
                                   <option value="">
                                     Select supervisor
                                   </option>
 
                                   {supervisors
-                                    .filter(
-                                      (supervisor) =>
-                                        supervisor.assignedBlocks?.includes(
-                                          complaint.block
-                                        )
-                                    )
-                                    .map(
-                                      (supervisor) => (
-                                        <option
-                                          key={
-                                            supervisor._id
-                                          }
-                                          value={
-                                            supervisor._id
-                                          }
-                                        >
-                                          {
-                                            supervisor.name
-                                          }{" "}
-                                          -{" "}
-                                          {supervisor.assignedBlocks?.join(
-                                            ", "
-                                          )}
-                                        </option>
+                                    .filter((supervisor) =>
+                                      supervisor.assignedBlocks?.includes(
+                                        complaint.block
                                       )
-                                    )}
+                                    )
+                                    .map((supervisor) => (
+                                      <option
+                                        key={supervisor._id}
+                                        value={supervisor._id}
+                                      >
+                                        {supervisor.name} -{" "}
+                                        {supervisor.assignedBlocks?.join(", ")}
+                                      </option>
+                                    ))}
                                 </select>
 
                                 <button
                                   onClick={() => {
                                     const selectedId =
-                                      selectedSupervisors[
-                                        complaint._id
-                                      ] ||
+                                      selectedSupervisors[complaint._id] ||
                                       supervisorId;
 
                                     assignComplaint(
@@ -1190,9 +1119,8 @@ function AdminComplaints() {
                                     );
                                   }}
                                   disabled={
-                                    !selectedSupervisors[
-                                      complaint._id
-                                    ] && !supervisorId
+                                    !selectedSupervisors[complaint._id] &&
+                                    !supervisorId
                                   }
                                   className="rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                                 >
@@ -1203,26 +1131,25 @@ function AdminComplaints() {
                                 </button>
                               </div>
 
-                              <p className="mt-2 text-xs font-semibold text-slate-500">
+                              <p className="mt-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
                                 Assigned block:{" "}
-                                <span className="text-indigo-600">
-                                  {complaint.block ||
-                                    "Not specified"}
+                                <span className="text-indigo-600 dark:text-indigo-400">
+                                  {complaint.block || "Not specified"}
                                 </span>
                               </p>
                             </div>
                           ) : (
-                            <div className="flex flex-1 items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
-                              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-xl shadow-sm">
+                            <div className="flex flex-1 items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-4 dark:border-emerald-800 dark:bg-emerald-950/30">
+                              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-xl shadow-sm dark:bg-slate-800">
                                 ✅
                               </div>
 
                               <div>
-                                <p className="font-bold text-emerald-800">
+                                <p className="font-bold text-emerald-800 dark:text-emerald-300">
                                   Work Completed
                                 </p>
 
-                                <p className="text-xs text-emerald-600">
+                                <p className="text-xs text-emerald-600 dark:text-emerald-400">
                                   Complaint successfully resolved by technician.
                                 </p>
                               </div>
@@ -1232,11 +1159,7 @@ function AdminComplaints() {
                           {/* DELETE */}
 
                           <button
-                            onClick={() =>
-                              deleteComplaint(
-                                complaint._id
-                              )
-                            }
+                            onClick={() => deleteComplaint(complaint._id)}
                             className="rounded-xl bg-red-600 px-6 py-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-red-700 hover:shadow-lg active:scale-[0.98]"
                           >
                             🗑️ Delete Complaint
@@ -1247,23 +1170,37 @@ function AdminComplaints() {
                   </div>
                 );
               })}
+
             </div>
           )}
         </main>
 
         {/* ================= ADMIN TIP ================= */}
 
+        {/* ================= ADMIN TIP ================= */}
+
         <section className="mx-auto max-w-7xl px-6 pb-10">
-          <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-6">
+          <div
+            className={`rounded-2xl border p-6 transition-colors ${darkMode
+              ? "border-indigo-800 bg-indigo-950/40"
+              : "border-indigo-100 bg-indigo-50"
+              }`}
+          >
             <div className="flex gap-4">
               <div className="text-2xl">💡</div>
 
               <div>
-                <h3 className="font-bold text-indigo-900">
+                <h3
+                  className={`font-bold ${darkMode ? "text-indigo-300" : "text-indigo-900"
+                    }`}
+                >
                   Admin Tip
                 </h3>
 
-                <p className="mt-2 text-sm leading-6 text-indigo-700">
+                <p
+                  className={`mt-2 text-sm leading-6 ${darkMode ? "text-indigo-200" : "text-indigo-700"
+                    }`}
+                >
                   Assign pending complaints to the appropriate
                   supervisor as soon as possible. The supervisor
                   will then assign the suitable technician for
@@ -1276,20 +1213,34 @@ function AdminComplaints() {
 
         {/* ================= FOOTER ================= */}
 
-        <footer className="mt-6 border-t border-slate-200 bg-white">
+        <footer
+          className={`mt-6 border-t transition-colors ${darkMode
+            ? "border-slate-700 bg-slate-900"
+            : "border-slate-200 bg-white"
+            }`}
+        >
           <div className="mx-auto max-w-7xl px-6 py-8">
             <div className="flex flex-col items-center justify-between gap-4 text-center sm:flex-row sm:text-left">
               <div>
-                <p className="text-lg font-bold text-slate-800">
+                <p
+                  className={`text-lg font-bold ${darkMode ? "text-white" : "text-slate-800"
+                    }`}
+                >
                   CampusFix
                 </p>
 
-                <p className="mt-1 text-sm text-slate-500">
+                <p
+                  className={`mt-1 text-sm ${darkMode ? "text-slate-400" : "text-slate-500"
+                    }`}
+                >
                   Medi-Caps University
                 </p>
               </div>
 
-              <div className="text-sm text-slate-500">
+              <div
+                className={`text-sm ${darkMode ? "text-slate-400" : "text-slate-500"
+                  }`}
+              >
                 <p>
                   Smart Campus • Faster Resolution • Better
                   Management

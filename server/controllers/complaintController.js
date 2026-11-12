@@ -425,13 +425,19 @@ const updateComplaintStatus = async (req, res) => {
 // V Admin → Common Supervisor
 // =====================================================
 
+
+
 const assignComplaint = async (req, res) => {
   try {
     const { supervisorId } = req.body;
 
-    const existingComplaint = await Complaint.findById(
-      req.params.id
-    );
+    if (!supervisorId) {
+      return res.status(400).json({
+        message: "Please select a supervisor",
+      });
+    }
+
+    const existingComplaint = await Complaint.findById(req.params.id);
 
     if (!existingComplaint) {
       return res.status(404).json({
@@ -439,159 +445,120 @@ const assignComplaint = async (req, res) => {
       });
     }
 
-    // =================================================
-    // VERIFY ADMIN
-    // =================================================
-
     const admin = await User.findById(req.user.userId);
 
     if (!admin || admin.role !== "admin") {
       return res.status(403).json({
-        message: "Access denied. Admin only.",
+        message: "Only an admin can assign complaints",
       });
     }
 
-    // =================================================
-    // ADMIN CAN ONLY MANAGE HIS/HER ASSIGNED BLOCKS
-    // =================================================
+    const normalizeBlock = (block) =>
+      String(block || "").trim().toLowerCase();
 
-    const canManageBlock = (
-      admin.assignedBlocks || []
-    ).includes(existingComplaint.block);
+    const canManageBlock = (admin.assignedBlocks || []).some(
+      (block) =>
+        normalizeBlock(block) ===
+        normalizeBlock(existingComplaint.block)
+    );
 
     if (!canManageBlock) {
       return res.status(403).json({
-        message:
-          `You are not authorized to manage complaints from ${existingComplaint.block}.`,
+        message: "You are not authorized to manage complaints for this block",
       });
     }
-
-    // =================================================
-    // RESOLVED COMPLAINT CANNOT BE REASSIGNED
-    // =================================================
 
     if (existingComplaint.status === "Resolved") {
       return res.status(400).json({
-        message: "Resolved complaint cannot be reassigned",
+        message: "Resolved complaints cannot be reassigned",
       });
     }
 
-    // =================================================
-    // FIND COMMON SUPERVISOR
-    //
-    // supervisorId is still accepted from frontend.
-    // But the selected supervisor must be a supervisor.
-    //
-    // Most importantly, we NO LONGER require:
-    // assignedBlocks: existingComplaint.block
-    //
-    // This allows one common Supervisor to receive
-    // complaints from every Admin/block.
-    // =================================================
-
-    let supervisor;
-
-    if (supervisorId) {
-      supervisor = await User.findOne({
-        _id: supervisorId,
-        role: "supervisor",
-      }).select(
-        "name email assignedBlocks"
-      );
-    } else {
-      // Fallback:
-      // If frontend does not send supervisorId,
-      // use the first available Supervisor.
-      supervisor = await User.findOne({
-        role: "supervisor",
-      })
-        .sort({
-          createdAt: 1,
-        })
-        .select(
-          "name email assignedBlocks"
-        );
-    }
+    // Find the selected supervisor
+    const supervisor = await User.findOne({
+      _id: supervisorId,
+      role: "supervisor",
+    }).select("name email assignedBlocks");
 
     if (!supervisor) {
       return res.status(404).json({
-        message:
-          "Common Supervisor not found. Please create a supervisor account first.",
+        message: "Supervisor not found",
       });
     }
 
-    // =================================================
-    // ASSIGN COMPLAINT TO COMMON SUPERVISOR
-    // =================================================
+    const supervisorBlocks = supervisor.assignedBlocks || [];
 
-    const complaint = await Complaint.findByIdAndUpdate(
-      req.params.id,
-      {
-        supervisor: supervisor._id,
-        technician: null,
-        status: "Assigned",
-        assignedAt: new Date(),
-      },
-      {
-        new: true,
-      }
-    );
+    // Only single-block supervisors can receive new assignments
+    if (supervisorBlocks.length !== 1) {
+      return res.status(403).json({
+        message: "Common legacy supervisors cannot receive new complaint assignments",
+      });
+    }
 
-    // =================================================
-    // NOTIFICATION → COMMON SUPERVISOR
-    // =================================================
+    // Verify supervisor belongs to the complaint's block
+    const belongsToBlock =
+      normalizeBlock(supervisorBlocks[0]) ===
+      normalizeBlock(existingComplaint.block);
 
+    if (!belongsToBlock) {
+      return res.status(403).json({
+        message: "Selected supervisor does not belong to this complaint's block",
+      });
+    }
+
+    // Assign complaint
+    existingComplaint.supervisor = supervisor._id;
+    existingComplaint.technician = null;
+    existingComplaint.status = "Assigned";
+    existingComplaint.assignedAt = new Date();
+    existingComplaint.technicianAssignedAt = null;
+
+    await existingComplaint.save();
+
+    // Notify supervisor
     await createNotification({
       recipient: supervisor._id,
       title: "New Complaint Assigned",
-      message:
-        `A ${complaint.category} complaint from ${complaint.block}, Room ${complaint.room} has been assigned to you.`,
+      message: `A ${existingComplaint.category} complaint from ${existingComplaint.block}, Room ${existingComplaint.room} has been assigned to you.`,
       type: "supervisor_assigned",
-      complaint: complaint._id,
+      complaint: existingComplaint._id,
     });
 
-    // =================================================
-    // RESPONSE
-    // =================================================
-
-    res.json({
-      message:
-        "Complaint assigned to common supervisor successfully",
-
+    return res.json({
+      message: "Complaint assigned to block supervisor successfully.",
       complaint: {
-        _id: complaint._id,
-        block: complaint.block,
-        floor: complaint.floor,
-        room: complaint.room,
-        category: complaint.category,
-        description: complaint.description,
-        image: complaint.image,
-        priority: complaint.priority,
-        status: complaint.status,
+        _id: existingComplaint._id,
+        block: existingComplaint.block,
+        floor: existingComplaint.floor,
+        room: existingComplaint.room,
+        category: existingComplaint.category,
+        description: existingComplaint.description,
+        image: existingComplaint.image,
+        priority: existingComplaint.priority,
+        status: existingComplaint.status,
         supervisor: {
           _id: supervisor._id,
           name: supervisor.name,
           email: supervisor.email,
-          assignedBlocks:
-            supervisor.assignedBlocks || [],
+          assignedBlocks: supervisor.assignedBlocks,
         },
         technician: null,
-        createdAt: complaint.createdAt,
-        assignedAt: complaint.assignedAt,
-        technicianAssignedAt:
-          complaint.technicianAssignedAt,
-        resolvedAt: complaint.resolvedAt,
+        createdAt: existingComplaint.createdAt,
+        assignedAt: existingComplaint.assignedAt,
+        technicianAssignedAt: null,
+        resolvedAt: existingComplaint.resolvedAt,
       },
     });
   } catch (error) {
-    console.log("Assign complaint error:", error);
+    console.log("Assign Complaint Error:", error);
 
-    res.status(500).json({
-      message: "Failed to assign complaint",
-      error: error.message,
+    return res.status(500).json({
+      message: "Server error while assigning complaint",
     });
   }
 };
+
+
 
 // =====================================================
 // DELETE COMPLAINT

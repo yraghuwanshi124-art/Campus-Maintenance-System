@@ -6,6 +6,7 @@ import LogoutModal from "../components/LogoutModal";
 import ComplaintForm from "./ComplaintForm";
 import MyComplaints from "./MyComplaints";
 import CampusFixChatbot from "../components/CampusFixChatbot";
+import { useTheme } from "../context/ThemeContext";
 
 
 function StudentDashboard() {
@@ -21,9 +22,7 @@ function StudentDashboard() {
   const [showLogout, setShowLogout] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  const [darkMode, setDarkMode] = useState(
-    localStorage.getItem("campusfix_student_dark_mode") === "true"
-  );
+  const { darkMode, toggleTheme } = useTheme();
 
   const [profileImage, setProfileImage] = useState(
     localStorage.getItem("campusfix_student_profile_image") || ""
@@ -40,13 +39,6 @@ function StudentDashboard() {
   useEffect(() => {
     fetchComplaints();
   }, []);
-
-  useEffect(() => {
-    localStorage.setItem(
-      "campusfix_student_dark_mode",
-      darkMode.toString()
-    );
-  }, [darkMode]);
 
   const fetchComplaints = async () => {
     try {
@@ -1153,37 +1145,33 @@ function StudentDashboard() {
     );
   };
 
-  const renderContent = () => {
-    /*
-     * Route-based pages stay inside StudentDashboard,
-     * so sidebar + navbar never disappear.
-     */
-    if (location.pathname === "/student/report") {
-      return <ComplaintForm />;
-    }
+const renderContent = () => {
+  if (location.pathname === "/student/report" || currentSection === "report") {
+    return <ComplaintForm darkMode={darkMode} />;
+  }
 
-    if (location.pathname === "/student/complaints") {
-      return <MyComplaints />;
-    }
+  if (location.pathname === "/student/complaints" || currentSection === "complaints") {
+    return <MyComplaints darkMode={darkMode} />;
+  }
 
-    if (currentSection === "profile") {
-      return renderProfile();
-    }
+  if (currentSection === "profile") {
+    return renderProfile();
+  }
 
-    if (currentSection === "activity") {
-      return renderActivity();
-    }
+  if (currentSection === "activity") {
+    return renderActivity();
+  }
 
-    if (currentSection === "chatbot") {
-      return <CampusFixChatbot darkMode={darkMode} />
-    }
+  if (currentSection === "chatbot") {
+    return <CampusFixChatbot darkMode={darkMode} />;
+  }
 
-    return renderDashboard();
-  };
+  return renderDashboard();
+};
 
   return (
     <div
-      className={`min-h-screen transition-colors duration-200 ${darkMode ? "bg-slate-950" : "bg-slate-50"
+      className={`min-h-screen transition-colors duration-200 ${darkMode ? "bg-slate-950 dark" : "bg-slate-50"
         }`}
     >
       {/* Mobile Overlay */}
@@ -1281,17 +1269,23 @@ function StudentDashboard() {
           >
             <button
               type="button"
-              onClick={() => setDarkMode(!darkMode)}
+              onClick={toggleTheme}
               className={`mb-2 flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition ${darkMode
                 ? "text-slate-300 hover:bg-slate-900"
                 : "text-slate-600 hover:bg-slate-50"
                 }`}
             >
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-base">
+              <span
+                className={`flex h-9 w-9 items-center justify-center rounded-lg text-base transition ${
+                  darkMode
+                    ? "bg-slate-800 text-amber-400"
+                    : "bg-slate-100 text-slate-600"
+                }`}
+              >
                 {darkMode ? "☀" : "☾"}
               </span>
 
-              <span className="text-lg font-bold">
+              <span className="text-sm font-bold">
                 {darkMode ? "Light Mode" : "Dark Mode"}
               </span>
             </button>
@@ -1299,13 +1293,21 @@ function StudentDashboard() {
             <button
               type="button"
               onClick={() => setShowLogout(true)}
-              className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-slate-600 transition hover:bg-red-50 hover:text-red-600"
+              className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition ${
+                darkMode
+                  ? "text-slate-400 hover:bg-red-950/30 hover:text-red-400"
+                  : "text-slate-600 hover:bg-red-50 hover:text-red-600"
+              }`}
             >
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-50 text-base">
+              <span
+                className={`flex h-9 w-9 items-center justify-center rounded-lg text-base transition ${
+                  darkMode ? "bg-slate-800 text-slate-400" : "bg-slate-50 text-slate-500"
+                }`}
+              >
                 ↪
               </span>
 
-              <span className="text-lg font-bold">
+              <span className="text-sm font-bold">
                 Logout
               </span>
             </button>

@@ -1,5 +1,5 @@
-
 import { useEffect, useState } from "react";
+import { useTheme } from "../context/ThemeContext";
 import api from "../services/api";
 import AdminSidebar from "../components/AdminSidebar";
 import LogoutModal from "../components/LogoutModal";
@@ -7,6 +7,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 function AdminMonthlyReport() {
+  const { darkMode } = useTheme();
   const [complaints, setComplaints] = useState([]);
   const [showLogout, setShowLogout] = useState(false);
 
@@ -139,7 +140,11 @@ function AdminMonthlyReport() {
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7);
-    doc.text("CAMPUSFIX  •  CAMPUS MAINTENANCE MANAGEMENT SYSTEM", 14, 12.5);
+    doc.text(
+      "CAMPUSFIX  •  CAMPUS MAINTENANCE MANAGEMENT SYSTEM",
+      14,
+      12.5
+    );
 
     doc.setTextColor(100, 116, 139);
     doc.setFontSize(7);
@@ -216,6 +221,9 @@ function AdminMonthlyReport() {
     );
 
     /*
+
+
+        /*
      * Report Information
      */
 
@@ -517,7 +525,7 @@ function AdminMonthlyReport() {
 
     drawFooter(doc);
 
-    /*
+        /*
      * ------------------------------------------------
      * PAGE 2 — DETAILED COMPLAINT REGISTER
      * ------------------------------------------------
@@ -808,216 +816,189 @@ function AdminMonthlyReport() {
     );
   };
 
+    const pageBg = darkMode ? "bg-slate-950 text-slate-100" : "bg-slate-50 text-slate-800";
+  const panelBg = darkMode ? "border-slate-800 bg-slate-900" : "border-slate-200 bg-white";
+  const mutedText = darkMode ? "text-slate-400" : "text-slate-500";
+  const headingText = darkMode ? "text-white" : "text-slate-900";
+  const tableBorder = darkMode ? "border-slate-800" : "border-slate-100";
+  const tableCellText = darkMode ? "text-slate-300" : "text-slate-600";
+
+  const statCards = [
+    { label: "Total complaints", value: monthlyTotal, accent: "indigo", icon: "▤", note: "Reported this month" },
+    { label: "Resolved", value: monthlyResolved, accent: "emerald", icon: "✓", note: "Successfully closed" },
+    { label: "Pending", value: monthlyPending, accent: "blue", icon: "◷", note: "Awaiting action" },
+    { label: "Assigned", value: monthlyAssigned, accent: "orange", icon: "↗", note: "Assigned to staff" },
+    { label: "In progress", value: monthlyInProgress, accent: "purple", icon: "⟳", note: "Currently being handled" },
+  ];
+
+  const accentStyles = {
+    indigo: darkMode ? "bg-indigo-500/10 text-indigo-300 ring-indigo-400/20" : "bg-indigo-50 text-indigo-700 ring-indigo-100",
+    emerald: darkMode ? "bg-emerald-500/10 text-emerald-300 ring-emerald-400/20" : "bg-emerald-50 text-emerald-700 ring-emerald-100",
+    blue: darkMode ? "bg-blue-500/10 text-blue-300 ring-blue-400/20" : "bg-blue-50 text-blue-700 ring-blue-100",
+    orange: darkMode ? "bg-orange-500/10 text-orange-300 ring-orange-400/20" : "bg-orange-50 text-orange-700 ring-orange-100",
+    purple: darkMode ? "bg-purple-500/10 text-purple-300 ring-purple-400/20" : "bg-purple-50 text-purple-700 ring-purple-100",
+  };
+
+  const statusStyles = {
+    Resolved: darkMode ? "bg-emerald-500/10 text-emerald-300 ring-emerald-400/20" : "bg-emerald-50 text-emerald-700 ring-emerald-100",
+    "In Progress": darkMode ? "bg-purple-500/10 text-purple-300 ring-purple-400/20" : "bg-purple-50 text-purple-700 ring-purple-100",
+    Assigned: darkMode ? "bg-orange-500/10 text-orange-300 ring-orange-400/20" : "bg-orange-50 text-orange-700 ring-orange-100",
+    Pending: darkMode ? "bg-blue-500/10 text-blue-300 ring-blue-400/20" : "bg-blue-50 text-blue-700 ring-blue-100",
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className={`min-h-screen transition-colors duration-200 ${pageBg}`}>
       <AdminSidebar onLogout={() => setShowLogout(true)} />
 
-      <div className="lg:ml-64">
-        <header className="border-b border-slate-200 bg-white px-6 py-5">
-          <h1 className="text-2xl font-black text-slate-800">
-            Monthly Reports
-          </h1>
-
-          <p className="mt-1 text-sm text-slate-500">
-            Complaint summary for {currentMonthName}
-          </p>
+      <div className="min-h-screen lg:ml-64">
+        <header className={`sticky top-0 z-20 border-b px-5 py-5 backdrop-blur-xl sm:px-8 ${
+          darkMode ? "border-slate-800 bg-slate-950/90" : "border-slate-200 bg-white/90"
+        }`}>
+          <div className="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className={`mb-1 text-xs font-bold uppercase tracking-[0.2em] ${darkMode ? "text-indigo-300" : "text-indigo-600"}`}>
+                CampusFix · Administration
+              </div>
+              <h1 className={`text-2xl font-black tracking-tight sm:text-3xl ${headingText}`}>
+                Monthly Reports
+              </h1>
+              <p className={`mt-1 text-sm ${mutedText}`}>
+                Maintenance activity and complaint performance for {currentMonthName}
+              </p>
+            </div>
+            <div className={`inline-flex w-fit items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold ${
+              darkMode ? "border-slate-700 bg-slate-900 text-slate-300" : "border-slate-200 bg-slate-50 text-slate-600"
+            }`}>
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              Current reporting period
+            </div>
+          </div>
         </header>
 
-        <main className="p-6">
-          <div className="mb-6 flex flex-col justify-between gap-4 rounded-2xl bg-white p-6 shadow-sm md:flex-row md:items-center">
-            <div>
-              <p className="text-sm font-semibold text-slate-500">
-                Monthly Summary
-              </p>
-
-              <h2 className="mt-1 text-2xl font-black text-slate-800">
-                {currentMonthName}
-              </h2>
-
-              <p className="mt-1 text-sm text-slate-500">
-                Review complaint activity and download the
-                official administration report.
-              </p>
-            </div>
-
-            <button
-              onClick={downloadMonthlyPDF}
-              className="rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-indigo-700"
-            >
-              ↓ Download Professional PDF
-            </button>
-          </div>
-
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
-            <div className="rounded-2xl bg-white p-5 shadow-sm">
-              <p className="text-sm text-slate-500">
-                Total
-              </p>
-
-              <h3 className="mt-2 text-3xl font-black text-slate-800">
-                {monthlyTotal}
-              </h3>
-            </div>
-
-            <div className="rounded-2xl bg-white p-5 shadow-sm">
-              <p className="text-sm text-slate-500">
-                Resolved
-              </p>
-
-              <h3 className="mt-2 text-3xl font-black text-emerald-600">
-                {monthlyResolved}
-              </h3>
-            </div>
-
-            <div className="rounded-2xl bg-white p-5 shadow-sm">
-              <p className="text-sm text-slate-500">
-                Pending
-              </p>
-
-              <h3 className="mt-2 text-3xl font-black text-blue-600">
-                {monthlyPending}
-              </h3>
-            </div>
-
-            <div className="rounded-2xl bg-white p-5 shadow-sm">
-              <p className="text-sm text-slate-500">
-                Assigned
-              </p>
-
-              <h3 className="mt-2 text-3xl font-black text-orange-600">
-                {monthlyAssigned}
-              </h3>
-            </div>
-
-            <div className="rounded-2xl bg-white p-5 shadow-sm">
-              <p className="text-sm text-slate-500">
-                In Progress
-              </p>
-
-              <h3 className="mt-2 text-3xl font-black text-purple-600">
-                {monthlyInProgress}
-              </h3>
-            </div>
-          </div>
-
-          <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+        <main className="mx-auto max-w-7xl space-y-7 p-5 sm:p-8">
+          <section className={`relative overflow-hidden rounded-3xl border p-6 shadow-sm sm:p-8 ${panelBg}`}>
+            <div className="pointer-events-none absolute -right-12 -top-20 h-64 w-64 rounded-full bg-indigo-500/10 blur-3xl" />
+            <div className="relative flex flex-col justify-between gap-6 md:flex-row md:items-center">
               <div>
-                <h2 className="text-lg font-black text-slate-800">
-                  Monthly Complaints
+                <p className={`text-xs font-bold uppercase tracking-[0.18em] ${darkMode ? "text-indigo-300" : "text-indigo-600"}`}>
+                  Monthly overview
+                </p>
+                <h2 className={`mt-2 text-3xl font-black tracking-tight sm:text-4xl ${headingText}`}>
+                  {currentMonthName}
                 </h2>
+                <p className={`mt-2 max-w-2xl text-sm leading-6 ${mutedText}`}>
+                  Review the month’s complaint activity, monitor resolution progress, and export an official university administration report.
+                </p>
+                <div className={`mt-5 flex flex-wrap gap-4 text-xs font-medium ${mutedText}`}>
+                  <span>● {monthlyTotal} total records</span>
+                  <span>● {monthlyResolved} resolved</span>
+                  <span>● {activeComplaints} active cases</span>
+                </div>
+              </div>
+              <button
+                onClick={downloadMonthlyPDF}
+                className="inline-flex shrink-0 items-center justify-center gap-3 rounded-xl bg-indigo-600 px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-indigo-600/20 transition hover:-translate-y-0.5 hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/30"
+              >
+                <span className="text-lg">↓</span>
+                Download official PDF
+              </button>
+            </div>
+          </section>
 
-                <p className="mt-1 text-sm text-slate-500">
-                  {monthlyComplaints.length} complaints
-                  created this month
+          <section>
+            <div className="mb-4 flex items-end justify-between gap-3">
+              <div>
+                <h2 className={`text-lg font-extrabold ${headingText}`}>Performance snapshot</h2>
+                <p className={`mt-1 text-sm ${mutedText}`}>Key complaint indicators for this month</p>
+              </div>
+              <span className={`hidden rounded-lg px-3 py-1.5 text-xs font-semibold sm:inline-flex ${
+                darkMode ? "bg-slate-900 text-slate-400" : "bg-white text-slate-500 shadow-sm"
+              }`}>Live summary</span>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+              {statCards.map((card) => (
+                <article key={card.label} className={`group rounded-2xl border p-5 shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-lg ${panelBg}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <p className={`text-xs font-bold uppercase tracking-wider ${mutedText}`}>{card.label}</p>
+                    <span className={`inline-flex h-10 w-10 items-center justify-center rounded-xl text-lg font-bold ring-1 ${accentStyles[card.accent]}`}>
+                      {card.icon}
+                    </span>
+                  </div>
+                  <p className={`mt-5 text-3xl font-black tracking-tight ${headingText}`}>{card.value}</p>
+                  <p className={`mt-1 text-xs ${mutedText}`}>{card.note}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className={`overflow-hidden rounded-3xl border shadow-sm ${panelBg}`}>
+            <div className={`flex flex-col justify-between gap-3 border-b px-6 py-5 sm:flex-row sm:items-center ${tableBorder}`}>
+              <div>
+                <h2 className={`text-lg font-extrabold ${headingText}`}>Monthly complaints register</h2>
+                <p className={`mt-1 text-sm ${mutedText}`}>
+                  {monthlyComplaints.length} {monthlyComplaints.length === 1 ? "complaint" : "complaints"} created during {currentMonthName}
                 </p>
               </div>
-
-              <div className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600">
+              <div className={`w-fit rounded-xl px-3 py-2 text-xs font-bold ${darkMode ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-600"}`}>
                 {currentMonthName}
               </div>
             </div>
 
             {monthlyComplaints.length === 0 ? (
-              <div className="py-12 text-center text-sm text-slate-500">
-                No complaints found for this month.
+              <div className="px-6 py-16 text-center">
+                <div className={`mx-auto flex h-14 w-14 items-center justify-center rounded-2xl text-2xl ${darkMode ? "bg-slate-800 text-slate-400" : "bg-slate-100 text-slate-400"}`}>▤</div>
+                <h3 className={`mt-4 font-bold ${headingText}`}>No complaints this month</h3>
+                <p className={`mt-1 text-sm ${mutedText}`}>There are no complaint records for the current reporting period.</p>
               </div>
             ) : (
-              <div className="mt-5 overflow-x-auto">
+              <div className="overflow-x-auto">
                 <table className="w-full min-w-[850px] text-left">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-xs uppercase text-slate-400">
-                      <th className="px-4 py-3">
-                        Category
-                      </th>
-
-                      <th className="px-4 py-3">
-                        Location
-                      </th>
-
-                      <th className="px-4 py-3">
-                        Student
-                      </th>
-
-                      <th className="px-4 py-3">
-                        Status
-                      </th>
-
-                      <th className="px-4 py-3">
-                        Priority
-                      </th>
-
-                      <th className="px-4 py-3">
-                        Created
-                      </th>
+                  <thead className={darkMode ? "bg-slate-800/70" : "bg-slate-50"}>
+                    <tr className={`border-b text-[11px] uppercase tracking-wider ${tableBorder} ${mutedText}`}>
+                      <th className="px-6 py-4 font-bold">Category</th>
+                      <th className="px-6 py-4 font-bold">Location</th>
+                      <th className="px-6 py-4 font-bold">Reported by</th>
+                      <th className="px-6 py-4 font-bold">Status</th>
+                      <th className="px-6 py-4 font-bold">Priority</th>
+                      <th className="px-6 py-4 font-bold">Created</th>
                     </tr>
                   </thead>
-
                   <tbody>
                     {monthlyComplaints.map((complaint) => (
-                      <tr
-                        key={complaint._id}
-                        className="border-b border-slate-100"
-                      >
-                        <td className="px-4 py-4 font-semibold text-slate-700">
-                          {complaint.category || "—"}
+                      <tr key={complaint._id} className={`border-b transition-colors last:border-0 ${
+                        darkMode ? "border-slate-800 hover:bg-slate-800/50" : "border-slate-100 hover:bg-slate-50"
+                      }`}>
+                        <td className={`px-6 py-4 text-sm font-semibold ${headingText}`}>{complaint.category || "—"}</td>
+                        <td className={`px-6 py-4 text-sm ${tableCellText}`}>
+                          {complaint.block || "—"}{complaint.room ? ` · Room ${complaint.room}` : ""}
                         </td>
-
-                        <td className="px-4 py-4 text-sm text-slate-600">
-                          {complaint.block || "—"}{" "}
-                          {complaint.room
-                            ? `- Room ${complaint.room}`
-                            : ""}
-                        </td>
-
-                        <td className="px-4 py-4 text-sm text-slate-600">
-                          {complaint.user?.name || "—"}
-                        </td>
-
-                        <td className="px-4 py-4">
-                          <span
-                            className={`rounded-full px-3 py-1 text-xs font-bold ${
-                              complaint.status ===
-                              "Resolved"
-                                ? "bg-emerald-50 text-emerald-700"
-                                : complaint.status ===
-                                  "In Progress"
-                                ? "bg-purple-50 text-purple-700"
-                                : complaint.status ===
-                                  "Assigned"
-                                ? "bg-orange-50 text-orange-700"
-                                : "bg-blue-50 text-blue-700"
-                            }`}
-                          >
+                        <td className={`px-6 py-4 text-sm ${tableCellText}`}>{complaint.user?.name || "—"}</td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex rounded-full px-3 py-1.5 text-xs font-bold ring-1 ${
+                            statusStyles[complaint.status] || (darkMode ? "bg-slate-800 text-slate-300 ring-slate-700" : "bg-slate-100 text-slate-600 ring-slate-200")
+                          }`}>
                             {complaint.status || "—"}
                           </span>
                         </td>
-
-                        <td className="px-4 py-4">
-                          <span
-                            className={`text-sm font-semibold ${
-                              complaint.priority === "High"
-                                ? "text-red-600"
-                                : complaint.priority ===
-                                  "Medium"
-                                ? "text-orange-600"
-                                : "text-emerald-600"
-                            }`}
-                          >
-                            {complaint.priority || "—"}
-                          </span>
+                        <td className="px-6 py-4">
+                          <span className={`text-xs font-bold ${
+                            complaint.priority === "High" ? (darkMode ? "text-red-300" : "text-red-600")
+                              : complaint.priority === "Medium" ? (darkMode ? "text-orange-300" : "text-orange-600")
+                              : (darkMode ? "text-emerald-300" : "text-emerald-600")
+                          }`}>{complaint.priority || "—"}</span>
                         </td>
-
-                        <td className="px-4 py-4 text-sm text-slate-500">
-                          {formatDate(complaint.createdAt)}
-                        </td>
+                        <td className={`whitespace-nowrap px-6 py-4 text-sm ${mutedText}`}>{formatDate(complaint.createdAt)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             )}
-          </div>
+            <div className={`border-t px-6 py-3 text-xs ${tableBorder} ${mutedText}`}>
+              Official CampusFix monthly administration summary · Medi-Caps University
+            </div>
+          </section>
         </main>
       </div>
 

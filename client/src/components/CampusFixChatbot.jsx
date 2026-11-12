@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 import campusFixKnowledge from "../data/campusFixKnowledge";
+import { useTheme } from "../context/ThemeContext";
 
 // ============================================================
 // CampusFix AI Chatbot
@@ -1174,7 +1175,9 @@ const generateAnswer = (question) => {
 // UI Component
 // ============================================================
 
-const CampusFixChatbot = ({ darkMode = false }) => {
+const CampusFixChatbot = ({ darkMode: darkModeProp }) => {
+  const { darkMode: contextDark } = useTheme();
+  const darkMode = typeof darkModeProp === "boolean" ? darkModeProp : contextDark;
   const initialMessage = {
     id: 1,
     sender: "bot",

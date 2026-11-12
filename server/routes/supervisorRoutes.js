@@ -4,6 +4,7 @@ const express = require("express");
 const {
   createSupervisor,
   getSupervisors,
+  updateSupervisor,
   getSupervisorComplaints,
   getTechniciansForSupervisor,
   assignTechnician,
@@ -26,12 +27,20 @@ router.post(
   createSupervisor
 );
 
-// Get supervisors
+// Get supervisors belonging to admin's blocks
 router.get(
   "/",
   protect,
   allowRoles("admin"),
   getSupervisors
+);
+
+// Edit supervisor
+router.put(
+  "/:id",
+  protect,
+  allowRoles("admin"),
+  updateSupervisor
 );
 
 // =====================================================

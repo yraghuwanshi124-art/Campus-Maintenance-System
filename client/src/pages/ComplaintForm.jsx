@@ -1,51 +1,18 @@
-
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
+import { useTheme } from "../context/ThemeContext";
 
-// ================= CAMPUS BLOCK LIST =================
-// Medi-Caps University campus blocks — single source of truth for the form
-const CAMPUS_BLOCKS = [
-  "A Block",
-  "B Block",
-  "C Block",
-  "D Block",
-  "E Block",
-  "F Block",
-  "G Block",
-  "H Block",
-  "I Block",
-  "J Block",
-  "K Block",
-  "L Block",
-  "M Block",
-  "N Block",
-  "O Block",
-  "P Block",
-  "Q Block",
-  "R Block",
-  "S Block",
-  "T Block",
-  "U Block",
-  "V Block",
-  "W Block",
-  "X Block",
-  "Y Block",
-  "Z Block",
+const CAMPUS_BLOCKS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+  .split("")
+  .map((letter) => `${letter} Block`);
 
-];
+const generateRooms = (start, end) =>
+  Array.from(
+    { length: end - start + 1 },
+    (_, index) => `Room ${start + index}`
+  );
 
-// ================= CAMPUS BLOCK, FLOOR & ROOM CONFIGURATION =================
-
-const generateRooms = (start, end) => {
-  const rooms = [];
-  for (let i = start; i <= end; i++) {
-    rooms.push(`Room ${i}`);
-  }
-  return rooms;
-};
-
-// Explicit floor & room mappings for blocks with defined structures
 const BLOCK_FLOOR_ROOM_DATA = {
   "A Block": [
     { floor: "A1", rooms: generateRooms(1, 10) },
@@ -75,36 +42,42 @@ const BLOCK_FLOOR_ROOM_DATA = {
     { floor: "V3", rooms: generateRooms(21, 30) },
     { floor: "V4", rooms: generateRooms(31, 40) },
     { floor: "V5", rooms: generateRooms(41, 50) },
-  ]
+  ],
 };
 
 function getBlockFloorsAndRooms(blockName) {
   if (!blockName) return [];
+
   if (BLOCK_FLOOR_ROOM_DATA[blockName]) {
     return BLOCK_FLOOR_ROOM_DATA[blockName];
   }
 
-  // Derive floor prefix for any block (e.g., "E Block" -> "E", "Z Block" -> "Z", "AB Block" -> "AB")
-  let prefix = "";
   const match = blockName.match(/^([A-Za-z]+)\s*Block$/i);
-  if (match) {
-    prefix = match[1].toUpperCase();
-  } else {
-    const words = blockName.split(/\s+/);
-    prefix = words.map((w) => w[0].toUpperCase()).join("");
-  }
 
-  // Sensible default: 4 floors with 10 rooms each
-  return [
-    { floor: `${prefix}1`, rooms: generateRooms(1, 10) },
-    { floor: `${prefix}2`, rooms: generateRooms(11, 20) },
-    { floor: `${prefix}3`, rooms: generateRooms(21, 30) },
-    { floor: `${prefix}4`, rooms: generateRooms(31, 40) },
-  ];
+  const prefix = match
+    ? match[1].toUpperCase()
+    : blockName
+      .split(/\s+/)
+      .map((word) => word[0]?.toUpperCase() || "")
+      .join("");
+
+  return [1, 2, 3, 4].map((floor) => ({
+    floor: `${prefix}${floor}`,
+    rooms: generateRooms((floor - 1) * 10 + 1, floor * 10),
+  }));
 }
 
-// ================= REUSABLE SEARCHABLE DROPDOWN COMPONENT =================
+const initialFormData = (user) => ({
+  block: "",
+  floor: "",
+  room: "",
+  mobileNumber: user?.phoneNumber || "",
+  category: "",
+  description: "",
+  priority: "Medium",
+});
 
+/* Searchable dropdown with dark mode support */
 function SearchableDropdown({
   id,
   label,
@@ -120,6 +93,7 @@ function SearchableDropdown({
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+
   const containerRef = useRef(null);
   const searchRef = useRef(null);
 
@@ -127,29 +101,26 @@ function SearchableDropdown({
     item.toLowerCase().includes(search.toLowerCase())
   );
 
-  // Close on click outside
   useEffect(() => {
-    const handler = (e) => {
+    const handler = (event) => {
       if (
         containerRef.current &&
-        !containerRef.current.contains(e.target)
+        !containerRef.current.contains(event.target)
       ) {
         setOpen(false);
         setSearch("");
       }
     };
+
     document.addEventListener("mousedown", handler);
+
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Auto-focus search when dropdown opens
   useEffect(() => {
-    if (open && searchRef.current) {
-      searchRef.current.focus();
-    }
+    if (open) searchRef.current?.focus();
   }, [open]);
 
-  // Close when disabled becomes true
   useEffect(() => {
     if (disabled) {
       setOpen(false);
@@ -163,199 +134,101 @@ function SearchableDropdown({
     setSearch("");
   };
 
-  const handleToggle = () => {
-    if (disabled) return;
-    setOpen((prev) => !prev);
-    if (!open) setSearch("");
-  };
-
   return (
-    <div ref={containerRef} style={{ position: "relative" }}>
-      <label className="mb-2 block text-sm font-bold text-slate-700">
-        {label} {required && <span className="text-red-500">*</span>}
+    <div ref={containerRef} className="relative min-w-0">
+      <label
+        htmlFor={id}
+        className="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-200"
+      >
+        {label} {required && <span className="text-rose-500">*</span>}
       </label>
 
-      {/* Trigger button */}
       <button
         type="button"
         id={id}
-        onClick={handleToggle}
+        onClick={() => !disabled && setOpen((previous) => !previous)}
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className={[
-          "flex w-full items-center justify-between rounded-xl border px-3.5 py-3.5 text-sm outline-none transition text-left",
-          disabled
-            ? "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed opacity-75"
+        className={`flex min-h-[50px] w-full items-center justify-between gap-3 rounded-xl border px-3.5 py-3 text-left text-sm outline-none transition focus:ring-4 focus:ring-indigo-500/15 ${disabled
+            ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-500"
             : open
-              ? "border-indigo-500 bg-white ring-4 ring-indigo-100 cursor-pointer"
-              : "border-slate-300 bg-slate-50 hover:border-indigo-400 hover:bg-white cursor-pointer",
-          value && !disabled ? "font-medium text-slate-800" : "text-slate-400",
-        ].join(" ")}
+              ? "border-indigo-500 bg-white text-slate-800 ring-4 ring-indigo-500/10 dark:bg-slate-900 dark:text-slate-100"
+              : "border-slate-200 bg-slate-50 text-slate-700 hover:border-indigo-300 hover:bg-white dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:border-indigo-500 dark:hover:bg-slate-900"
+          }`}
       >
-        <span className="flex items-center gap-2 truncate">
-          <span className="shrink-0 text-slate-400 text-xs">🔍</span>
-          <span className="truncate">
-            {value || (disabled ? disabledPlaceholder : placeholder)}
-          </span>
-        </span>
         <span
-          className="ml-2 shrink-0 text-slate-400 text-xs"
-          style={{
-            display: "inline-block",
-            transform: open ? "rotate(180deg)" : "rotate(0deg)",
-            transition: "transform 0.2s ease",
-          }}
+          className={`truncate ${value
+              ? "font-semibold text-slate-800 dark:text-slate-100"
+              : "text-slate-400 dark:text-slate-500"
+            }`}
         >
-          &#9662;
+          {value || (disabled ? disabledPlaceholder : placeholder)}
+        </span>
+
+        <span
+          className={`shrink-0 text-slate-400 dark:text-slate-500 transition-transform ${open ? "rotate-180" : ""
+            }`}
+        >
+          ⌄
         </span>
       </button>
 
-      {/* Dropdown panel */}
       {open && !disabled && (
-        <div
-          role="listbox"
-          aria-label={label}
-          style={{
-            position: "absolute",
-            top: "calc(100% + 6px)",
-            left: 0,
-            right: 0,
-            zIndex: 999,
-            background: "#fff",
-            border: "1.5px solid #e0e7ff",
-            borderRadius: "16px",
-            boxShadow:
-              "0 8px 32px 0 rgba(99,102,241,0.13), 0 2px 8px 0 rgba(0,0,0,0.07)",
-            overflow: "hidden",
-            animation: "cf-dropdown-in 0.18s cubic-bezier(.4,0,.2,1)",
-          }}
-        >
-          {/* Search box */}
-          <div
-            style={{
-              padding: "10px 12px 8px",
-              borderBottom: "1px solid #f1f5f9",
-              background: "#f8faff",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                background: "#fff",
-                border: "1.5px solid #c7d2fe",
-                borderRadius: "10px",
-                padding: "7px 12px",
-              }}
-            >
-              <span style={{ fontSize: "14px", color: "#818cf8" }}>
-                &#128269;
-              </span>
+        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[100] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_18px_55px_-18px_rgba(15,23,42,0.3)] dark:border-slate-700 dark:bg-slate-900">
+          <div className="border-b border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/70">
+            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 dark:border-slate-700 dark:bg-slate-900">
+              <span className="text-slate-400">⌕</span>
+
               <input
                 ref={searchRef}
                 type="text"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(event) => setSearch(event.target.value)}
                 placeholder={searchPlaceholder}
                 aria-label={searchPlaceholder}
-                style={{
-                  border: "none",
-                  outline: "none",
-                  background: "transparent",
-                  fontSize: "13px",
-                  color: "#334155",
-                  width: "100%",
-                }}
+                className="w-full border-0 bg-transparent py-2.5 text-sm text-slate-800 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
               />
+
               {search && (
                 <button
                   type="button"
                   onClick={() => setSearch("")}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "#94a3b8",
-                    fontSize: "13px",
-                    padding: 0,
-                    lineHeight: 1,
-                  }}
+                  className="text-slate-400 hover:text-slate-700 dark:hover:text-white"
                   aria-label="Clear search"
                 >
-                  &#x2715;
+                  ×
                 </button>
               )}
             </div>
           </div>
 
-          {/* Options list */}
           <ul
-            style={{
-              maxHeight: "220px",
-              overflowY: "auto",
-              margin: 0,
-              padding: "6px 0",
-              listStyle: "none",
-            }}
+            role="listbox"
+            aria-label={label}
+            className="m-0 max-h-56 list-none overflow-y-auto p-1.5"
           >
             {filtered.length === 0 ? (
-              <li
-                style={{
-                  padding: "14px 16px",
-                  textAlign: "center",
-                  color: "#94a3b8",
-                  fontSize: "13px",
-                }}
-              >
+              <li className="px-4 py-5 text-center text-sm text-slate-400 dark:text-slate-500">
                 {emptyMessage}
               </li>
             ) : (
               filtered.map((item) => {
-                const isSelected = value === item;
+                const selected = value === item;
+
                 return (
-                  <li
-                    key={item}
-                    role="option"
-                    aria-selected={isSelected}
-                    onClick={() => handleSelect(item)}
-                    style={{
-                      padding: "10px 14px",
-                      cursor: "pointer",
-                      fontSize: "13px",
-                      fontWeight: isSelected ? 700 : 500,
-                      color: isSelected ? "#4f46e5" : "#334155",
-                      background: isSelected ? "#eef2ff" : "transparent",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      borderRadius: "8px",
-                      margin: "1px 6px",
-                      transition: "background 0.12s",
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!isSelected)
-                        e.currentTarget.style.background = "#f8faff";
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isSelected)
-                        e.currentTarget.style.background = "transparent";
-                    }}
-                  >
-                    <span className="truncate">{item}</span>
-                    {isSelected && (
-                      <span
-                        style={{
-                          color: "#4f46e5",
-                          fontSize: "13px",
-                          fontWeight: 800,
-                          marginLeft: "6px",
-                        }}
-                      >
-                        &#10003;
-                      </span>
-                    )}
+                  <li key={item} role="option" aria-selected={selected}>
+                    <button
+                      type="button"
+                      onClick={() => handleSelect(item)}
+                      className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm transition ${selected
+                          ? "bg-indigo-50 font-semibold text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300"
+                          : "text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                        }`}
+                    >
+                      <span>{item}</span>
+                      {selected && <span aria-hidden="true">✓</span>}
+                    </button>
                   </li>
                 );
               })
@@ -363,187 +236,208 @@ function SearchableDropdown({
           </ul>
         </div>
       )}
-
-      {/* Dropdown open animation */}
-      <style>{`
-        @keyframes cf-dropdown-in {
-          from { opacity: 0; transform: translateY(-6px) scaleY(0.97); }
-          to   { opacity: 1; transform: translateY(0)   scaleY(1); }
-        }
-      `}</style>
     </div>
   );
 }
 
-// Backward compatibility wrapper
-function BlockDropdown(props) {
+function SectionHeading({ icon, title, subtitle, number }) {
   return (
-    <SearchableDropdown
-      id="block-dropdown-trigger"
-      label="Block"
-      required
-      options={CAMPUS_BLOCKS}
-      placeholder="Search or select block..."
-      searchPlaceholder="Search block..."
-      emptyMessage="No blocks found"
-      {...props}
-    />
+    <div className="mb-5 flex items-start gap-3.5">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-xl ring-1 ring-indigo-100 dark:bg-indigo-500/15 dark:ring-indigo-400/20">
+        {icon}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          {number && (
+            <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-indigo-500 dark:text-indigo-400">
+              Step {number}
+            </span>
+          )}
+
+          <h2 className="text-base font-bold tracking-tight text-slate-900 dark:text-white sm:text-lg">
+            {title}
+          </h2>
+        </div>
+
+        <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
+          {subtitle}
+        </p>
+      </div>
+    </div>
   );
 }
 
-function ComplaintForm() {
+function FieldLabel({ children, htmlFor, required = false }) {
+  return (
+    <label
+      htmlFor={htmlFor}
+      className="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-200"
+    >
+      {children} {required && <span className="text-rose-500">*</span>}
+    </label>
+  );
+}
+
+const inputClass =
+  "w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-600 dark:focus:border-indigo-400 dark:focus:bg-slate-900";
+
+const readOnlyClass =
+  "w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200";
+function ComplaintForm({ darkMode }) {
   const navigate = useNavigate();
+  const { darkMode: contextDark } = useTheme();
 
-  const user = JSON.parse(localStorage.getItem("user"));
+  // Single source of truth: use darkMode prop or context theme.
+  const isDark =
+    typeof darkMode === "boolean"
+      ? darkMode
+      : contextDark;
 
-  const [formData, setFormData] = useState({
-    block: "",
-    floor: "",
-    room: "",
-    mobileNumber: user?.phoneNumber || "",
-    category: "",
-    description: "",
-    priority: "Medium",
+  const [user, setUser] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("user") || "null");
+    } catch {
+      return null;
+    }
   });
 
+  const [formData, setFormData] = useState(() => initialFormData(user));
   const [mobileTouched, setMobileTouched] = useState(false);
-  const isMobileValid = /^[0-9]{10}$/.test(formData.mobileNumber);
-
   const [image, setImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState("");
   const [submitting, setSubmitting] = useState(false);
-
-  // Duplicate complaint states
   const [duplicateComplaint, setDuplicateComplaint] = useState(null);
   const [duplicateMessage, setDuplicateMessage] = useState("");
   const [alreadySupported, setAlreadySupported] = useState(false);
   const [supporting, setSupporting] = useState(false);
+  const [notice, setNotice] = useState(null);
 
-  // Dependent options
+  const isMobileValid = /^[0-9]{10}$/.test(formData.mobileNumber);
+
+  useEffect(() => {
+    try {
+      const storedUser = JSON.parse(localStorage.getItem("user") || "null");
+
+      setUser(storedUser);
+
+      setFormData((previous) => ({
+        ...previous,
+        mobileNumber:
+          previous.mobileNumber || storedUser?.phoneNumber || "",
+      }));
+    } catch {
+      // Keep the form usable if local storage contains invalid JSON.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!image) {
+      setImagePreview("");
+      return undefined;
+    }
+
+    const url = URL.createObjectURL(image);
+    setImagePreview(url);
+
+    return () => URL.revokeObjectURL(url);
+  }, [image]);
+
   const availableFloorsData = getBlockFloorsAndRooms(formData.block);
-  const availableFloors = availableFloorsData.map((f) => f.floor);
+  const availableFloors = availableFloorsData.map((item) => item.floor);
+
   const currentFloorData = availableFloorsData.find(
-    (f) => f.floor === formData.floor
+    (item) => item.floor === formData.floor
   );
+
   const availableRooms = currentFloorData ? currentFloorData.rooms : [];
 
-  // Dependent selection handlers
-  const handleBlockChange = (selectedBlock) => {
-    setFormData((prev) => ({
-      ...prev,
-      block: selectedBlock,
+  const handleBlockChange = (block) => {
+    setFormData((previous) => ({
+      ...previous,
+      block,
       floor: "",
       room: "",
     }));
   };
 
-  const handleFloorChange = (selectedFloor) => {
-    setFormData((prev) => ({
-      ...prev,
-      floor: selectedFloor,
+  const handleFloorChange = (floor) => {
+    setFormData((previous) => ({
+      ...previous,
+      floor,
       room: "",
     }));
   };
 
-  const handleRoomChange = (selectedRoom) => {
-    setFormData((prev) => ({
-      ...prev,
-      room: selectedRoom,
-    }));
+  const handleRoomChange = (room) => {
+    setFormData((previous) => ({ ...previous, room }));
   };
 
-  const handleMobileChange = (e) => {
-    // Only accept numeric digits, up to 10 digits
-    const cleaned = e.target.value.replace(/\D/g, "").slice(0, 10);
-    setFormData((prev) => ({
-      ...prev,
-      mobileNumber: cleaned,
-    }));
-    if (!mobileTouched) {
-      setMobileTouched(true);
-    }
+  const handleMobileChange = (event) => {
+    const mobileNumber = event.target.value.replace(/\D/g, "").slice(0, 10);
+
+    setFormData((previous) => ({ ...previous, mobileNumber }));
+    setMobileTouched(true);
   };
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+
+    setFormData((previous) => ({ ...previous, [name]: value }));
   };
 
   const resetForm = () => {
-    const [formData, setFormData] = useState({
-      block: "",
-      floor: "",
-      room: "",
-      mobileNumber: user?.phoneNumber || "",
-      category: "",
-      description: "",
-      priority: "Medium",
-    });
-
+    setFormData(initialFormData(user));
     setMobileTouched(false);
     setImage(null);
+    setImagePreview("");
+    setNotice(null);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setNotice(null);
 
-    // Validate mobile number
-    if (!formData.mobileNumber || !/^[0-9]{10}$/.test(formData.mobileNumber)) {
+    if (!isMobileValid) {
       setMobileTouched(true);
-      alert("Please enter a valid 10-digit mobile number.");
+
+      setNotice({
+        type: "error",
+        text:
+          "Please enter a valid 10-digit mobile number in your account profile.",
+      });
+
       return;
     }
 
-    // Validate required fields
-    if (!formData.block.trim()) {
-      alert("Please select a block.");
+    if (
+      !formData.block ||
+      !formData.floor ||
+      !formData.room ||
+      !formData.category ||
+      !formData.description.trim() ||
+      !image
+    ) {
+      setNotice({
+        type: "error",
+        text:
+          "Please complete all required fields and upload a photo before submitting.",
+      });
+
       return;
     }
 
-    if (!formData.floor.trim()) {
-      alert("Please select a floor.");
-      return;
-    }
-
-    if (!formData.room.trim()) {
-      alert("Please select a room.");
-      return;
-    }
-
-    // Verify valid block + floor + room combinations
-    const validFloors = getBlockFloorsAndRooms(formData.block).map(
-      (f) => f.floor
+    const validFloorData = getBlockFloorsAndRooms(formData.block).find(
+      (floor) => floor.floor === formData.floor
     );
-    if (!validFloors.includes(formData.floor)) {
-      alert(
-        `Invalid floor "${formData.floor}" for ${formData.block}. Please select a valid floor.`
-      );
-      return;
-    }
 
-    const floorObj = getBlockFloorsAndRooms(formData.block).find(
-      (f) => f.floor === formData.floor
-    );
-    if (!floorObj || !floorObj.rooms.includes(formData.room)) {
-      alert(
-        `Invalid room "${formData.room}" for floor ${formData.floor}. Please select a valid room.`
-      );
-      return;
-    }
+    if (!validFloorData || !validFloorData.rooms.includes(formData.room)) {
+      setNotice({
+        type: "error",
+        text:
+          "The selected block, floor and room combination is invalid. Please select the location again.",
+      });
 
-    if (!formData.category) {
-      alert("Please select a problem category.");
-      return;
-    }
-
-    if (!formData.description.trim()) {
-      alert("Please describe the problem.");
-      return;
-    }
-
-    if (!image) {
-      alert("Please upload a photo of the problem.");
       return;
     }
 
@@ -552,9 +446,10 @@ function ComplaintForm() {
 
       const token = localStorage.getItem("token");
 
-      let imageUrl = "";
+      if (!token) {
+        throw new Error("Your session could not be found. Please sign in again.");
+      }
 
-      // Upload image to Cloudinary
       const uploadData = new FormData();
 
       uploadData.append("file", image);
@@ -570,18 +465,19 @@ function ComplaintForm() {
 
       const cloudinaryData = await cloudinaryResponse.json();
 
-      if (!cloudinaryResponse.ok) {
-        throw new Error("Image upload failed");
+      if (!cloudinaryResponse.ok || !cloudinaryData.secure_url) {
+        throw new Error(
+          cloudinaryData.error?.message ||
+          "Photo upload failed. Please try another image."
+        );
       }
 
-      imageUrl = cloudinaryData.secure_url;
-
-      // Submit complaint
       const response = await api.post(
         "/complaints",
         {
           ...formData,
-          image: imageUrl,
+          description: formData.description.trim(),
+          image: cloudinaryData.secure_url,
         },
         {
           headers: {
@@ -590,13 +486,22 @@ function ComplaintForm() {
         }
       );
 
-      alert(response.data.message);
+      setNotice({
+        type: "success",
+        text:
+          response.data.message ||
+          "Your complaint has been submitted successfully.",
+      });
 
       resetForm();
 
-      navigate("/student/complaints");
+      navigate("/student/complaints", {
+        state: {
+          successMessage:
+            response.data.message || "Complaint submitted successfully.",
+        },
+      });
     } catch (error) {
-      // Duplicate complaint found
       if (
         error.response?.status === 409 &&
         error.response?.data?.duplicate
@@ -604,32 +509,28 @@ function ComplaintForm() {
         const duplicateData = error.response.data;
 
         setDuplicateComplaint(duplicateData.complaint);
+
         setDuplicateMessage(
-          duplicateData.message ||
-          "A similar active complaint already exists."
-        );
-        setAlreadySupported(
-          duplicateData.alreadySupported || false
+          duplicateData.message || "A similar active complaint already exists."
         );
 
-        return;
+        setAlreadySupported(duplicateData.alreadySupported || false);
+      } else {
+        setNotice({
+          type: "error",
+          text:
+            error.response?.data?.message ||
+            error.message ||
+            "Failed to submit complaint. Please try again.",
+        });
       }
-
-      alert(
-        error.response?.data?.message ||
-        error.message ||
-        "Failed to submit complaint"
-      );
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Support existing complaint
   const handleSupportComplaint = async () => {
-    if (!duplicateComplaint?._id) {
-      return;
-    }
+    if (!duplicateComplaint?._id) return;
 
     try {
       setSupporting(true);
@@ -646,20 +547,23 @@ function ComplaintForm() {
         }
       );
 
-      alert(response.data.message);
-
       setDuplicateComplaint(null);
       setDuplicateMessage("");
       setAlreadySupported(false);
 
-      resetForm();
-
-      navigate("/student/complaints");
+      navigate("/student/complaints", {
+        state: {
+          successMessage:
+            response.data.message || "Your support has been added.",
+        },
+      });
     } catch (error) {
-      alert(
-        error.response?.data?.message ||
-        "Failed to support complaint"
-      );
+      setNotice({
+        type: "error",
+        text:
+          error.response?.data?.message ||
+          "Failed to support the existing complaint.",
+      });
     } finally {
       setSupporting(false);
     }
@@ -671,479 +575,716 @@ function ComplaintForm() {
     setAlreadySupported(false);
   };
 
-  const supporterCount =
-    duplicateComplaint?.supporters?.length || 0;
+  const supporterCount = duplicateComplaint?.supporters?.length || 0;
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* ================= NAVBAR ================= */}
-      <nav className="border-b border-indigo-100 bg-indigo-50 shadow-sm">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          {/* Branding */}
-          <div className="flex items-center gap-5">
-            <div className="rounded-xl bg-white px-3 py-1.5 shadow-sm">
-              <img
-                src="https://www.medicaps.ac.in/public/frontend/images/medicaps-logo-fin.webp"
-                alt="Medi-Caps University"
-                className="h-11 w-auto object-contain"
-              />
+    <div
+      className={`transition-colors duration-200 ${isDark ? "dark" : ""}`}
+      data-theme={isDark ? "dark" : "light"}
+    >
+      <div className="min-h-screen overflow-x-hidden bg-[#f6f7fb] text-slate-800 transition-colors duration-300 dark:bg-slate-950 dark:text-slate-100">
+        {/* Navigation */}
+        <nav className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/90">
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3.5 sm:px-6 lg:px-8">
+            <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+              <div className="flex h-12 items-center rounded-xl border border-slate-100 bg-white px-2.5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                <img
+                  src="https://www.medicaps.ac.in/public/frontend/images/medicaps-logo-fin.webp"
+                  alt="Medi-Caps University"
+                  className="h-8 w-auto object-contain sm:h-9"
+                />
+              </div>
+
+              <div className="min-w-0 border-l border-slate-200 pl-3 dark:border-slate-700 sm:pl-4">
+                <p className="truncate text-lg font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-xl">
+                  Campus<span className="text-indigo-600 dark:text-indigo-400">Fix</span>
+                </p>
+
+                <p className="hidden text-xs text-slate-500 dark:text-slate-400 sm:block">
+                  Campus Maintenance Management
+                </p>
+              </div>
             </div>
 
-            <div className="hidden border-l-2 border-indigo-200 pl-5 sm:block">
-              <p className="text-xl font-extrabold tracking-tight text-indigo-700">
-                CampusFix
-              </p>
-
-              <p className="mt-1 text-sm font-medium text-slate-600">
-                Campus Maintenance Management System
-              </p>
-            </div>
+            <button
+              type="button"
+              onClick={() => navigate("/student")}
+              className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:text-indigo-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-indigo-500 dark:hover:text-indigo-300 sm:px-4"
+            >
+              <span aria-hidden="true">←</span>
+              <span>Dashboard</span>
+            </button>
           </div>
+        </nav>
 
-          {/* Back Button */}
-          <button
-            type="button"
-            onClick={() => navigate("/student")}
-            className="rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-indigo-600 shadow-sm transition hover:bg-indigo-100"
-          >
-            ← Dashboard
-          </button>
-        </div>
-      </nav>
-
-      {/* ================= MAIN ================= */}
-      <main className="mx-auto max-w-4xl px-5 py-10 sm:px-6">
-        {/* Page Header */}
-        <div className="mb-8">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-indigo-100 px-4 py-2 text-sm font-semibold text-indigo-700">
-            🛠️ Maintenance Request
-          </div>
-
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-800 sm:text-4xl">
-            Report a Problem
-          </h1>
-
-          <p className="mt-3 max-w-2xl text-base leading-7 text-slate-500">
-            Found a maintenance issue on campus? Provide the details
-            below and our maintenance team will take care of it.
-          </p>
-        </div>
-
-        {/* ================= FORM CARD ================= */}
-        <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl">
-          {/* Card Header */}
-          <div className="bg-gradient-to-r from-indigo-600 to-purple-700 px-6 py-6 text-white sm:px-8">
-            <h2 className="text-xl font-bold">
-              Complaint Details
-            </h2>
-
-            <p className="mt-1 text-sm text-indigo-100">
-              Please provide accurate information about the issue.
-            </p>
-          </div>
-
-          <form
-            onSubmit={handleSubmit}
-            className="space-y-7 p-6 sm:p-8"
-          >
-            {/* Student Information */}
-            <div className="mb-7 rounded-2xl border border-indigo-100 bg-indigo-50 p-5">
-              <div className="mb-4 flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-100 text-lg">
-                  👤
+        <main className="mx-auto max-w-7xl px-4 py-7 sm:px-6 sm:py-10 lg:px-8">
+          {/* Hero header */}
+          <div className="mb-8 overflow-hidden rounded-[28px] bg-gradient-to-br from-[#3730a3] via-indigo-700 to-violet-700 dark:from-indigo-950 dark:via-indigo-900 dark:to-slate-900 p-6 text-white shadow-xl shadow-indigo-950/10 sm:p-8 lg:p-10">
+            <div className="relative z-0 flex flex-col justify-between gap-7 md:flex-row md:items-center">
+              <div className="max-w-2xl">
+                <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold tracking-wide text-indigo-50 backdrop-blur">
+                  <span className="h-2 w-2 rounded-full bg-emerald-300" />
+                  STUDENT SUPPORT · MAINTENANCE REQUEST
                 </div>
 
-                <div>
-                  <h3 className="font-bold text-slate-800">
-                    Student Information
-                  </h3>
+                <h1 className="text-3xl font-black tracking-tight sm:text-4xl lg:text-[42px]">
+                  Report a Problem<span className="text-indigo-200">.</span>
+                </h1>
 
-                  <p className="text-xs text-slate-500">
-                    Details from your account
+                <p className="mt-3 max-w-xl text-sm leading-6 text-indigo-100 sm:text-base sm:leading-7">
+                  Help us keep your campus running smoothly. Share the location,
+                  describe the issue and attach a photo so the right team can act
+                  faster.
+                </p>
+
+                <div className="mt-6 flex flex-wrap gap-3 text-xs font-medium text-white/90 sm:text-sm">
+                  <span className="rounded-full border border-white/15 bg-white/10 px-3 py-2">
+                    ✓ Easy reporting
+                  </span>
+                  <span className="rounded-full border border-white/15 bg-white/10 px-3 py-2">
+                    ✓ Photo evidence
+                  </span>
+                  <span className="rounded-full border border-white/15 bg-white/10 px-3 py-2">
+                    ✓ Trackable request
+                  </span>
+                </div>
+              </div>
+
+              <div className="hidden shrink-0 md:block">
+                <div className="relative flex h-36 w-36 items-center justify-center rounded-[32px] border border-white/20 bg-white/10 shadow-inner backdrop-blur-sm lg:h-44 lg:w-44">
+                  <div className="absolute inset-3 rounded-[25px] border border-white/15" />
+                  <span className="text-6xl drop-shadow-sm lg:text-7xl" aria-hidden="true">
+                    🛠️
+                  </span>
+                  <span className="absolute -right-3 -top-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-400 text-xl text-emerald-950 shadow-lg">
+                    ✓
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px] xl:gap-8">
+            {/* Main form card */}
+            <section className="min-w-0 overflow-visible rounded-3xl border border-slate-200/80 bg-white shadow-[0_12px_40px_-24px_rgba(15,23,42,0.25)] dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-5 dark:border-slate-800 sm:px-8">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-400">
+                    New maintenance request
                   </p>
+                  <h2 className="mt-1 text-xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-2xl">
+                    Complaint details
+                  </h2>
+                </div>
+
+                <div className="hidden rounded-xl bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300 sm:block">
+                  ● Secure submission
                 </div>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-3">
-                {/* Name */}
-                <div>
-                  <label className="mb-1 block text-sm font-semibold text-slate-600">
-                    Name
-                  </label>
-
-                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-                    {user?.name || "N/A"}
+              <form onSubmit={handleSubmit} className="space-y-8 p-5 sm:p-8" noValidate>
+                {notice && (
+                  <div
+                    role="status"
+                    className={`flex items-start gap-3 rounded-2xl border px-4 py-3.5 text-sm ${notice.type === "error"
+                        ? "border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900/70 dark:bg-rose-950/30 dark:text-rose-200"
+                        : "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/70 dark:bg-emerald-950/30 dark:text-emerald-200"
+                      }`}
+                  >
+                    <span className="text-lg">
+                      {notice.type === "error" ? "⚠️" : "✓"}
+                    </span>
+                    <p className="leading-6">{notice.text}</p>
                   </div>
-                </div>
+                )}
 
-                {/* Email */}
-                <div>
-                  <label className="mb-1 block text-sm font-semibold text-slate-600">
-                    Email
-                  </label>
+                {/* Student information */}
+                <section>
+                  <SectionHeading
+                    icon="👤"
+                    title="Student information"
+                    subtitle="Your account details help the team identify and contact you."
+                    number="01"
+                  />
 
-                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-                    {user?.email || "N/A"}
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-950/40 sm:p-5">
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                      <div>
+                        <FieldLabel>Name</FieldLabel>
+                        <div className={readOnlyClass}>{user?.name || "Not available"}</div>
+                      </div>
+
+                      <div>
+                        <FieldLabel>Email</FieldLabel>
+                        <div className={`${readOnlyClass} break-all`}>
+                          {user?.email || "Not available"}
+                        </div>
+                      </div>
+
+                      <div>
+                        <FieldLabel>Class / Section</FieldLabel>
+                        <div className={readOnlyClass}>
+                          {user?.classSection || "Not available"}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 border-t border-slate-200 pt-4 dark:border-slate-800">
+                      <div className="max-w-md">
+                        <FieldLabel htmlFor="mobileNumber" required>
+                          Contact mobile number
+                        </FieldLabel>
+
+                        <div className="relative">
+                          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-sm font-semibold text-slate-400">
+                            +91
+                          </div>
+
+                          <input
+                            id="mobileNumber"
+                            type="tel"
+                            name="mobileNumber"
+                            value={formData.mobileNumber}
+                            onChange={handleMobileChange}
+                            maxLength={10}
+                            inputMode="numeric"
+                            required
+                            aria-invalid={mobileTouched && !isMobileValid}
+                            className={`${inputClass} pl-14 pr-20 ${mobileTouched && !isMobileValid
+                                ? "border-rose-400 focus:border-rose-500 focus:ring-rose-500/10"
+                                : ""
+                              }`}
+                            placeholder="10-digit mobile number"
+                          />
+
+                          {isMobileValid && (
+                            <span className="absolute inset-y-0 right-3 flex items-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                              ✓ Valid
+                            </span>
+                          )}
+                        </div>
+
+                        <p
+                          className={`mt-2 text-xs leading-5 ${mobileTouched && !isMobileValid
+                              ? "text-rose-600 dark:text-rose-400"
+                              : "text-slate-500 dark:text-slate-400"
+                            }`}
+                        >
+                          {mobileTouched && !isMobileValid
+                            ? "Enter a valid 10-digit mobile number."
+                            : "The maintenance team may contact you about this request."}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                </section>
 
-                {/* Class / Section */}
-                <div>
-                  <label className="mb-1 block text-sm font-semibold text-slate-600">
-                    Class / Section
-                  </label>
+                <div className="h-px bg-slate-100 dark:bg-slate-800" />
 
-                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-                    {user?.classSection || "N/A"}
-                  </div>
-                </div>
-              </div>
+                {/* Location */}
+                <section>
+                  <SectionHeading
+                    icon="📍"
+                    title="Problem location"
+                    subtitle="Select the exact location so the team knows where to go."
+                    number="02"
+                  />
 
-              {/* Mobile Number */}
-              <div className="mt-4 pt-4 border-t border-indigo-100">
-                <div className="max-w-md">
-                  <label className="mb-1.5 block text-sm font-bold text-slate-700">
-                    Mobile Number <span className="text-red-500">*</span>
-                  </label>
-
-                  <div className="relative">
-                    <input
-                      type="tel"
-                      name="mobileNumber"
-                      value={formData.mobileNumber}
-                      readOnly
-                      maxLength={10}
+                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    <SearchableDropdown
+                      id="block-select"
+                      label="Campus block"
                       required
-                      className={`w-full rounded-xl border bg-slate-50 px-4 py-3.5 text-sm outline-none ${isMobileValid
-                        ? "border-emerald-400"
-                        : "border-slate-300"
-                        }`}
+                      value={formData.block}
+                      onChange={handleBlockChange}
+                      options={CAMPUS_BLOCKS}
+                      placeholder="Choose a block"
+                      searchPlaceholder="Search blocks..."
+                      emptyMessage="No blocks found"
                     />
 
-                    {isMobileValid && (
-                      <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-sm font-extrabold text-emerald-600 flex items-center gap-1">
-                        <span>✓</span>
-                        <span className="text-xs font-semibold text-emerald-700">Valid</span>
-                      </span>
-                    )}
+                    <SearchableDropdown
+                      id="floor-select"
+                      label="Floor"
+                      required
+                      value={formData.floor}
+                      onChange={handleFloorChange}
+                      options={availableFloors}
+                      placeholder="Choose a floor"
+                      searchPlaceholder="Search floors..."
+                      disabled={!formData.block}
+                      disabledPlaceholder="Choose block first"
+                      emptyMessage="No floors available"
+                    />
+
+                    <SearchableDropdown
+                      id="room-select"
+                      label="Room"
+                      required
+                      value={formData.room}
+                      onChange={handleRoomChange}
+                      options={availableRooms}
+                      placeholder="Choose a room"
+                      searchPlaceholder="Search rooms..."
+                      disabled={!formData.floor}
+                      disabledPlaceholder="Choose floor first"
+                      emptyMessage="No rooms available"
+                    />
                   </div>
 
-                  {mobileTouched && !isMobileValid ? (
-                    <p className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-red-500">
-                      <span>✗</span>
-                      <span>Please enter a valid 10-digit mobile number.</span>
+                  <div className="mt-4 flex items-start gap-2.5 rounded-xl border border-indigo-100 bg-indigo-50/70 px-4 py-3 text-xs leading-5 text-indigo-800 dark:border-indigo-900/60 dark:bg-indigo-950/30 dark:text-indigo-200">
+                    <span className="mt-px text-base">💡</span>
+                    <p>
+                      <strong>Tip:</strong> Choose the block first, then the floor
+                      and room. The available options update automatically.
                     </p>
-                  ) : (
-                    <p className="mt-1.5 text-xs text-slate-500">
-                      Administration/technician will use this number to contact you regarding the problem.
-                    </p>
+                  </div>
+                </section>
+
+                <div className="h-px bg-slate-100 dark:bg-slate-800" />
+
+
+                {/* Problem details */}
+                <section>
+                  <SectionHeading
+                    icon="🔧"
+                    title="Problem information"
+                    subtitle="Describe what is wrong and select the closest matching category."
+                    number="03"
+                  />
+
+                  <div className="space-y-5">
+                    <div>
+                      <FieldLabel htmlFor="category" required>
+                        Problem category
+                      </FieldLabel>
+
+                      <select
+                        id="category"
+                        name="category"
+                        value={formData.category}
+                        onChange={handleChange}
+                        required
+                        className={`${inputClass} cursor-pointer`}
+                      >
+                        <option value="" className="bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-100">Select a category</option>
+                        <option value="Fan" className="bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-100">Fan</option>
+                        <option value="Light" className="bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-100">Light</option>
+                        <option value="Electrical" className="bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-100">Electrical</option>
+                        <option value="Projector" className="bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-100">Projector</option>
+                        <option value="Computer" className="bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-100">Computer</option>
+                        <option value="AC" className="bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-100">Air conditioning (AC)</option>
+                        <option value="Door" className="bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-100">Door</option>
+                        <option value="Furniture" className="bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-100">Furniture</option>
+                        <option value="Plumbing" className="bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-100">Plumbing</option>
+                        <option value="Other" className="bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-100">Other</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <FieldLabel htmlFor="description" required>
+                          Describe the problem
+                        </FieldLabel>
+                        <span className="text-xs text-slate-400">
+                          {formData.description.length}/1000
+                        </span>
+                      </div>
+
+                      <textarea
+                        id="description"
+                        name="description"
+                        placeholder="Explain what happened, where it happens, and any details that may help. For example: The projector powers on, but no image appears on the screen."
+                        value={formData.description}
+                        onChange={(event) => {
+                          if (event.target.value.length <= 1000) {
+                            handleChange(event);
+                          }
+                        }}
+                        rows={5}
+                        required
+                        maxLength={1000}
+                        className={`${inputClass} min-h-[140px] resize-y leading-6`}
+                      />
+
+                      <p className="mt-2 flex items-start gap-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                        <span>✦</span>
+                        <span>
+                          A clear description helps the maintenance team
+                          understand the issue faster.
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                </section>
+
+                <div className="h-px bg-slate-100 dark:bg-slate-800" />
+
+                {/* Photo upload */}
+                <section>
+                  <SectionHeading
+                    icon="📷"
+                    title="Photo evidence"
+                    subtitle="Upload a clear picture of the issue. A photo is required for submission."
+                    number="04"
+                  />
+
+                  <label
+                    htmlFor="problem-image"
+                    className={`group flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-5 py-7 text-center transition sm:py-9 ${image
+                        ? "border-indigo-300 bg-indigo-50/60 dark:border-indigo-700 dark:bg-indigo-950/20"
+                        : "border-slate-300 bg-slate-50/70 hover:border-indigo-400 hover:bg-indigo-50/60 dark:border-slate-700 dark:bg-slate-950/30 dark:hover:border-indigo-600 dark:hover:bg-indigo-950/20"
+                      }`}
+                  >
+                    {imagePreview ? (
+                      <div className="w-full max-w-sm">
+                        <img
+                          src={imagePreview}
+                          alt="Preview of uploaded problem"
+                          className="mx-auto max-h-56 rounded-xl border border-slate-200 object-contain shadow-sm dark:border-slate-700"
+                        />
+
+                        <p className="mt-3 break-all text-sm font-semibold text-indigo-700 dark:text-indigo-300">
+                          {image?.name}
+                        </p>
+
+                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                          Click to replace this photo
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <span className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-2xl text-slate-700 shadow-sm ring-1 ring-slate-200 transition group-hover:-translate-y-1 dark:bg-slate-900 dark:ring-slate-700 dark:text-slate-200">
+                          ↑
+                        </span>
+
+                        <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                          Click to upload or choose a photo
+                        </p>
+
+                        <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                          PNG, JPG or WebP · Max 8 MB recommended
+                        </p>
+                      </>
+                    )}
+
+                    <input
+                      id="problem-image"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="sr-only"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+
+                        if (!file) return;
+
+                        if (!/^image\/(png|jpeg|webp)$/.test(file.type)) {
+                          setNotice({
+                            type: "error",
+                            text: "Please choose a PNG, JPG or WebP image.",
+                          });
+                          event.target.value = "";
+                          return;
+                        }
+
+                        if (file.size > 8 * 1024 * 1024) {
+                          setNotice({
+                            type: "error",
+                            text:
+                              "This image is larger than 8 MB. Please choose a smaller photo.",
+                          });
+                          event.target.value = "";
+                          return;
+                        }
+
+                        setNotice(null);
+                        setImage(file);
+                      }}
+                    />
+                  </label>
+
+                  {image && (
+                    <button
+                      type="button"
+                      onClick={() => setImage(null)}
+                      className="mt-3 text-xs font-semibold text-rose-600 hover:text-rose-700 dark:text-rose-400"
+                    >
+                      Remove selected photo
+                    </button>
                   )}
-                </div>
-              </div>
-            </div>
+                </section>
 
-            {/* ================= LOCATION ================= */}
-            <div>
-              <div className="mb-4 flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-100 text-lg">
-                  📍
-                </div>
+                <div className="h-px bg-slate-100 dark:bg-slate-800" />
 
-                <div>
-                  <h3 className="font-bold text-slate-800">
-                    Location
+                {/* Priority */}
+                <section>
+                  <SectionHeading
+                    icon="⚡"
+                    title="Priority level"
+                    subtitle="Choose how urgently this problem needs attention."
+                    number="05"
+                  />
+
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {[
+                      {
+                        value: "Low",
+                        title: "Low priority",
+                        description: "Can be fixed later",
+                        icon: "○",
+                        style:
+                          "border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-200",
+                      },
+                      {
+                        value: "Medium",
+                        title: "Medium priority",
+                        description: "Needs attention",
+                        icon: "◉",
+                        style:
+                          "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200",
+                      },
+                      {
+                        value: "High",
+                        title: "High priority",
+                        description: "Urgent attention",
+                        icon: "⚡",
+                        style:
+                          "border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200",
+                      },
+                    ].map((option) => {
+                      const selected = formData.priority === option.value;
+
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() =>
+                            setFormData((previous) => ({
+                              ...previous,
+                              priority: option.value,
+                            }))
+                          }
+                          aria-pressed={selected}
+                          className={`relative rounded-2xl border p-4 text-left transition hover:-translate-y-0.5 ${selected
+                              ? `${option.style} ring-2 ring-indigo-500 ring-offset-2 ring-offset-white dark:ring-offset-[#0d1525]`
+                              : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:border-slate-600"
+                            }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-lg">{option.icon}</span>
+
+                            <span
+                              className={`flex h-5 w-5 items-center justify-center rounded-full border text-xs ${selected
+                                  ? "border-indigo-600 bg-indigo-600 text-white"
+                                  : "border-slate-300 text-transparent dark:border-slate-600"
+                                }`}
+                            >
+                              ✓
+                            </span>
+                          </div>
+
+                          <p className="mt-3 text-sm font-bold">
+                            {option.title}
+                          </p>
+
+                          <p
+                            className={`mt-1 text-xs ${selected
+                                ? "opacity-80"
+                                : "text-slate-400 dark:text-slate-500"
+                              }`}
+                          >
+                            {option.description}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+
+                {/* Submit section */}
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/40 sm:p-5">
+                  <div className="flex items-start gap-3">
+                    <span className="text-xl">🔒</span>
+
+                    <div>
+                      <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                        Review before submitting
+                      </p>
+
+                      <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                        Please verify the selected location and contact number.
+                        Your details and photo will be attached to this
+                        maintenance request.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                    <button
+                      type="button"
+                      onClick={resetForm}
+                      disabled={submitting}
+                      className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                    >
+                      Reset form
+                    </button>
+
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-600/20 transition hover:-translate-y-0.5 hover:from-indigo-700 hover:to-violet-700 hover:shadow-indigo-600/30 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 sm:min-w-56"
+                    >
+                      {submitting ? (
+                        <>
+                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                          Uploading & submitting...
+                        </>
+                      ) : (
+                        <>
+                          Submit complaint <span aria-hidden="true">→</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </section>
+
+
+            {/* Helpful sidebar */}
+            <aside className="space-y-5 lg:sticky lg:top-24">
+              <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-xl dark:bg-emerald-500/10">
+                    ✦
+                  </span>
+
+                  <h3 className="font-extrabold text-slate-900 dark:text-white">
+                    How it works
                   </h3>
-
-                  <p className="text-xs text-slate-400">
-                    Where is the problem located?
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-3">
-                {/* 1. Block Selection */}
-                <SearchableDropdown
-                  id="block-select"
-                  label="Block"
-                  required
-                  value={formData.block}
-                  onChange={handleBlockChange}
-                  options={CAMPUS_BLOCKS}
-                  placeholder="Search or select block..."
-                  searchPlaceholder="Search block..."
-                  emptyMessage="No blocks found"
-                />
-
-                {/* 2. Floor Selection */}
-                <SearchableDropdown
-                  id="floor-select"
-                  label="Floor"
-                  required
-                  value={formData.floor}
-                  onChange={handleFloorChange}
-                  options={availableFloors}
-                  placeholder="Search or select floor..."
-                  searchPlaceholder="Search floor..."
-                  disabled={!formData.block}
-                  disabledPlaceholder="Select block first..."
-                  emptyMessage="No floors available"
-                />
-
-                {/* 3. Room Selection */}
-                <SearchableDropdown
-                  id="room-select"
-                  label="Room"
-                  required
-                  value={formData.room}
-                  onChange={handleRoomChange}
-                  options={availableRooms}
-                  placeholder="Search or select room..."
-                  searchPlaceholder="Search room..."
-                  disabled={!formData.floor}
-                  disabledPlaceholder="Select floor first..."
-                  emptyMessage="No rooms available"
-                />
-              </div>
-            </div>
-
-            {/* Divider */}
-            <div className="h-px bg-slate-100"></div>
-
-            {/* ================= PROBLEM ================= */}
-            <div>
-              <div className="mb-4 flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-100 text-lg">
-                  🔧
                 </div>
 
-                <div>
-                  <h3 className="text-xl font-bold text-slate-800">
-                    Problem Information
-                  </h3>
+                <ol className="mt-5 space-y-4">
+                  {[
+                    ["01", "Tell us the location", "Select the block, floor and room."],
+                    ["02", "Add issue details", "Choose a category and explain the problem."],
+                    ["03", "Attach a photo", "A clear image helps the team assess it."],
+                    ["04", "Submit & track", "Your request is sent to the maintenance system."],
+                  ].map(([number, title, description], index) => (
+                    <li key={number} className="flex gap-3">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-xs font-extrabold text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">
+                        {number}
+                      </span>
 
-                  <p className="text-sm text-slate-400">
-                    Tell us what needs to be fixed.
-                  </p>
-                </div>
+                      <div className={index === 3 ? "" : "pb-3"}>
+                        <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                          {title}
+                        </p>
+
+                        <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                          {description}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
               </div>
 
-              {/* Category */}
-              <div className="mb-5">
-                <label className="mb-2 block text-sm font-bold text-slate-700">
-                  Problem Category
-                </label>
+              <div className="overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 to-violet-700 p-5 text-white shadow-lg shadow-indigo-900/10 sm:p-6">
+                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 text-2xl">
+                  💡
+                </span>
 
-                <select
-                  name="category"
-                  value={formData.category}
-                  onChange={handleChange}
-                  required
-                  className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100"
+                <h3 className="mt-4 text-lg font-extrabold">
+                  Help us resolve it faster
+                </h3>
+
+                <p className="mt-2 text-sm leading-6 text-indigo-100">
+                  Be specific about the issue, choose the correct room and
+                  upload a well-lit photo. It helps the maintenance team
+                  understand what needs attention.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => navigate("/student/complaints")}
+                  className="mt-5 inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-semibold transition hover:bg-white/20"
                 >
-                  <option value="">
-                    Select problem category
-                  </option>
-                  <option value="Fan">Fan</option>
-                  <option value="Light">Light</option>
-                  <option value="Electrical">Electrical</option>
-                  <option value="Projector">Projector</option>
-                  <option value="Computer">Computer</option>
-                  <option value="AC">AC</option>
-                  <option value="Door">Door</option>
-                  <option value="Furniture">Furniture</option>
-                  <option value="Plumbing">Plumbing</option>
-                  <option value="Other">Other</option>
-                </select>
+                  View my complaints <span aria-hidden="true">→</span>
+                </button>
               </div>
 
-              {/* Description */}
-              <div>
-                <label className="mb-2 block text-sm font-bold text-slate-700">
-                  Describe the Problem
-                </label>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                <div className="flex gap-3">
+                  <span className="text-lg">🛡️</span>
 
-                <textarea
-                  name="description"
-                  placeholder="Explain the problem clearly. For example: The projector is turning on but no display is visible..."
-                  value={formData.description}
-                  onChange={handleChange}
-                  rows="5"
-                  required
-                  className="w-full resize-none rounded-xl border border-slate-300 bg-slate-50 px-4 py-3.5 text-sm leading-6 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100"
-                />
+                  <div>
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                      Your details stay with your request
+                    </p>
 
-                <p className="mt-2 text-s text-slate-400">
-                  💡 A clear description helps the technician understand
-                  the issue faster.
-                </p>
-              </div>
-            </div>
-
-            {/* Divider */}
-            <div className="h-px bg-slate-100"></div>
-
-            {/* ================= PHOTO ================= */}
-            <div>
-              <div className="mb-4 flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-100 text-lg">
-                  📷
-                </div>
-
-                <div>
-                  <h3 className="font-bold text-slate-800">
-                    Problem Photo
-                  </h3>
-
-                  <p className="text-sm text-slate-400">
-                    Add a photo to help identify the issue.
-                  </p>
+                    <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                      Your contact information helps campus staff follow up if
+                      more details are needed.
+                    </p>
+                  </div>
                 </div>
               </div>
-
-              <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-indigo-200 bg-indigo-50/50 px-6 py-8 text-center transition hover:border-indigo-400 hover:bg-indigo-50">
-                <div className="text-4xl">📸</div>
-
-                <p className="mt-3 font-semibold text-slate-700">
-                  {image
-                    ? image.name
-                    : "Click to upload a photo"}
-                </p>
-
-                <p className="mt-1 text-xs text-slate-400">
-                  JPG, PNG or WebP
-                </p>
-
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  onChange={(e) =>
-                    setImage(e.target.files[0])
-                  }
-                  className="hidden"
-                />
-              </label>
-            </div>
-
-            {/* Divider */}
-            <div className="h-px bg-slate-100"></div>
-
-            {/* ================= PRIORITY ================= */}
-            <div>
-              <div className="mb-4 flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-100 text-lg">
-                  ⚡
-                </div>
-
-                <div>
-                  <h3 className="font-bold text-slate-800">
-                    Priority
-                  </h3>
-
-                  <p className="text-s text-slate-400">
-                    How urgent is this problem?
-                  </p>
-                </div>
-              </div>
-
-              <select
-                name="priority"
-                value={formData.priority}
-                onChange={handleChange}
-                className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3.5 text-sm font-medium text-slate-700 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100"
-              >
-                <option value="Low">
-                  Low — Can be fixed later
-                </option>
-
-                <option value="Medium">
-                  Medium — Needs attention
-                </option>
-
-                <option value="High">
-                  High — Requires urgent attention
-                </option>
-              </select>
-            </div>
-
-            {/* ================= SUBMIT ================= */}
-            <div className="pt-2">
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-700 px-6 py-4 text-base font-bold text-white shadow-lg transition hover:from-indigo-700 hover:to-purple-800 hover:shadow-xl active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {submitting
-                  ? "Submitting Complaint..."
-                  : "🚀 Submit Complaint"}
-              </button>
-
-              <p className="mt-3 text-center text-xs text-slate-400">
-                Please verify the location and problem details before
-                submitting.
-              </p>
-            </div>
-          </form>
-        </div>
-
-        {/* ================= INFO ================= */}
-        <div className="mt-6 rounded-2xl border border-indigo-100 bg-indigo-50 p-5">
-          <div className="flex gap-3">
-            <span className="text-xl">💡</span>
-
-            <div>
-              <p className="text-sm font-bold text-indigo-900">
-                Faster Resolution Tip
-              </p>
-
-              <p className="mt-1 text-sm leading-6 text-indigo-700">
-                Uploading a clear photo and providing the exact room
-                number can help the maintenance team resolve your
-                complaint faster.
-              </p>
-            </div>
+            </aside>
           </div>
-        </div>
-      </main>
+        </main>
 
-      {/* ================= FOOTER ================= */}
-      <footer className="mt-12 border-t border-slate-200 bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-7">
-          <div className="flex flex-col items-center justify-between gap-3 text-center sm:flex-row sm:text-left">
+        {/* Footer */}
+        <footer className="mt-8 border-t border-slate-200 bg-white/70 dark:border-slate-800 dark:bg-[#0b1220]/70">
+          <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-4 py-6 text-center sm:flex-row sm:px-6 sm:text-left lg:px-8">
             <div>
-              <p className="font-bold text-slate-800">
+              <p className="font-extrabold text-slate-800 dark:text-slate-200">
                 CampusFix
               </p>
-
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                 Medi-Caps University
               </p>
             </div>
 
-            <p className="text-xs text-slate-400">
-              Smart Campus • Faster Resolution • Better Management
+            <p className="text-xs text-slate-400 dark:text-slate-500">
+              Smart Campus <span className="mx-1.5">·</span> Faster Resolution
+              <span className="mx-1.5">·</span> Better Management
             </p>
           </div>
-        </div>
-      </footer>
+        </footer>
 
-      {/* ================= DUPLICATE COMPLAINT MODAL ================= */}
-      {duplicateComplaint && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-4 py-6 backdrop-blur-sm">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white shadow-2xl">
-            {/* Modal Header */}
-            <div className="border-b border-slate-100 px-6 py-5 sm:px-7">
-              <div className="flex items-start justify-between gap-4">
+        {/* Duplicate complaint modal */}
+        {duplicateComplaint && (
+          <div
+            className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-slate-950/70 px-4 py-6 backdrop-blur-sm"
+            role="presentation"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) {
+                closeDuplicateModal();
+              }
+            }}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="duplicate-title"
+              className="my-auto max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-[#0d1525]"
+            >
+              <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-5 dark:border-slate-800 sm:px-7">
                 <div className="flex items-start gap-3">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-xl">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-xl dark:bg-amber-500/15">
                     ⚠️
-                  </div>
+                  </span>
 
                   <div>
-                    <h2 className="text-lg font-extrabold text-slate-800">
-                      Similar Complaint Found
+                    <h2
+                      id="duplicate-title"
+                      className="text-lg font-extrabold text-slate-900 dark:text-white"
+                    >
+                      Similar complaint found
                     </h2>
 
-                    <p className="mt-1 text-sm leading-5 text-slate-500">
+                    <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
                       {duplicateMessage}
                     </p>
                   </div>
@@ -1152,157 +1293,138 @@ function ComplaintForm() {
                 <button
                   type="button"
                   onClick={closeDuplicateModal}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500 transition hover:bg-slate-200"
-                  aria-label="Close"
+                  aria-label="Close dialog"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                 >
-                  ✕
+                  ×
                 </button>
               </div>
-            </div>
 
-            {/* Existing Complaint */}
-            <div className="space-y-5 px-6 py-6 sm:px-7">
-              {/* Location */}
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
-                  Existing Complaint
-                </p>
+              <div className="space-y-5 p-5 sm:p-7">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/40">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                    Existing complaint
+                  </p>
 
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <p className="text-xs text-slate-400">
-                      Location
-                    </p>
+                  <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <p className="text-xs text-slate-400">Location</p>
+                      <p className="mt-1 text-sm font-bold text-slate-800 dark:text-slate-100">
+                        {duplicateComplaint.block}
+                        {duplicateComplaint.floor
+                          ? ` · Floor ${duplicateComplaint.floor}`
+                          : ""}
+                        {duplicateComplaint.room
+                          ? ` · ${duplicateComplaint.room.startsWith("Room")
+                            ? duplicateComplaint.room
+                            : `Room ${duplicateComplaint.room}`
+                          }`
+                          : ""}
+                      </p>
+                    </div>
 
-                    <p className="mt-1 font-bold text-slate-700">
-                      {duplicateComplaint.block}
-                      {duplicateComplaint.floor
-                        ? ` • Floor ${duplicateComplaint.floor}`
-                        : ""}
-                      {duplicateComplaint.room
-                        ? ` • ${duplicateComplaint.room.startsWith("Room")
-                          ? duplicateComplaint.room
-                          : `Room ${duplicateComplaint.room}`
-                        }`
-                        : ""}
-                    </p>
-                  </div>
+                    <div>
+                      <p className="text-xs text-slate-400">Category</p>
+                      <p className="mt-1 text-sm font-bold text-slate-800 dark:text-slate-100">
+                        {duplicateComplaint.category}
+                      </p>
+                    </div>
 
-                  <div>
-                    <p className="text-xs text-slate-400">
-                      Category
-                    </p>
+                    <div>
+                      <p className="text-xs text-slate-400">Status</p>
+                      <span className="mt-1 inline-flex rounded-full bg-indigo-100 px-3 py-1 text-xs font-bold text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">
+                        {duplicateComplaint.status}
+                      </span>
+                    </div>
 
-                    <p className="mt-1 font-bold text-slate-700">
-                      {duplicateComplaint.category}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-xs text-slate-400">
-                      Status
-                    </p>
-
-                    <span className="mt-1 inline-flex rounded-full bg-indigo-100 px-3 py-1 text-xs font-bold text-indigo-700">
-                      {duplicateComplaint.status}
-                    </span>
-                  </div>
-
-                  <div>
-                    <p className="text-xs text-slate-400">
-                      Priority
-                    </p>
-
-                    <p className="mt-1 font-bold text-slate-700">
-                      {duplicateComplaint.priority || "Medium"}
-                    </p>
+                    <div>
+                      <p className="text-xs text-slate-400">Priority</p>
+                      <p className="mt-1 text-sm font-bold text-slate-800 dark:text-slate-100">
+                        {duplicateComplaint.priority || "Medium"}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Description */}
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
-                  Problem Description
-                </p>
-
-                <p className="mt-2 rounded-2xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-600">
-                  {duplicateComplaint.description}
-                </p>
-              </div>
-
-              {/* Original Reporter */}
-              <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-4">
-                <p className="text-xs font-bold uppercase tracking-wide text-indigo-400">
-                  Reported By
-                </p>
-
-                <p className="mt-1 font-bold text-indigo-900">
-                  {duplicateComplaint.user?.name || "Student"}
-                </p>
-
-                {duplicateComplaint.user?.classSection && (
-                  <p className="mt-1 text-xs text-indigo-600">
-                    {duplicateComplaint.user.classSection}
-                  </p>
-                )}
-              </div>
-
-              {/* Support Count */}
-              <div className="flex items-center justify-between rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
                 <div>
-                  <p className="text-sm font-bold text-emerald-900">
-                    Students affected
+                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                    Problem description
                   </p>
 
-                  <p className="mt-1 text-xs text-emerald-700">
-                    Supporting this complaint helps the admin see
-                    how many students are affected.
+                  <p className="mt-2 whitespace-pre-wrap rounded-2xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+                    {duplicateComplaint.description}
                   </p>
                 </div>
 
-                <div className="ml-4 flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-lg font-extrabold text-emerald-700">
-                  {supporterCount + 1}
-                </div>
-              </div>
+                <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-4 dark:border-indigo-900/60 dark:bg-indigo-950/30">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-indigo-500 dark:text-indigo-300">
+                    Reported by
+                  </p>
 
-              {/* Actions */}
-              <div className="space-y-3">
-                {!alreadySupported ? (
+                  <p className="mt-1 font-bold text-indigo-950 dark:text-indigo-100">
+                    {duplicateComplaint.user?.name || "Student"}
+                  </p>
+
+                  {duplicateComplaint.user?.classSection && (
+                    <p className="mt-1 text-xs text-indigo-700 dark:text-indigo-300">
+                      {duplicateComplaint.user.classSection}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between gap-4 rounded-2xl border border-emerald-100 bg-emerald-50 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/25">
+                  <div>
+                    <p className="text-sm font-bold text-emerald-900 dark:text-emerald-200">
+                      Students affected
+                    </p>
+
+                    <p className="mt-1 text-xs leading-5 text-emerald-700 dark:text-emerald-300">
+                      Supporting this request helps the admin understand its
+                      impact.
+                    </p>
+                  </div>
+
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-lg font-extrabold text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200">
+                    {supporterCount + 1}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {!alreadySupported ? (
+                    <button
+                      type="button"
+                      onClick={handleSupportComplaint}
+                      disabled={supporting}
+                      className="w-full rounded-xl bg-indigo-600 px-5 py-3.5 text-sm font-bold text-white shadow-md transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {supporting
+                        ? "Adding your support..."
+                        : "👍 Support this complaint"}
+                    </button>
+                  ) : (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3.5 text-center text-sm font-bold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300">
+                      ✓ You have already supported this complaint
+                    </div>
+                  )}
+
                   <button
                     type="button"
-                    onClick={handleSupportComplaint}
-                    disabled={supporting}
-                    className="w-full rounded-2xl bg-indigo-600 px-5 py-3.5 text-sm font-bold text-white shadow-md transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    onClick={closeDuplicateModal}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-5 py-3.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
                   >
-                    {supporting
-                      ? "Adding Your Support..."
-                      : "👍 Support This Complaint"}
+                    Back to form
                   </button>
-                ) : (
-                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3.5 text-center text-sm font-bold text-emerald-700">
-                    ✓ You have already supported this complaint
-                  </div>
-                )}
+                </div>
 
-                <button
-                  type="button"
-                  onClick={closeDuplicateModal}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-5 py-3.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
+                <p className="text-center text-xs leading-5 text-slate-400 dark:text-slate-500">
+                  You don't need to submit another complaint for the same issue.
+                  Supporting the existing request keeps reports organized.
+                </p>
               </div>
-
-              <p className="text-center text-xs leading-5 text-slate-400">
-                You do not need to submit another complaint for the
-                same issue. Supporting the existing complaint keeps
-                the maintenance request organized.
-              </p>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

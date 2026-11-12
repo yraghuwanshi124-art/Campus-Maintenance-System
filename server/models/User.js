@@ -93,18 +93,27 @@ const userSchema = new mongoose.Schema(
 
     // ================= TECHNICIAN =================
 
-    specialization: {
-      type: String,
-      enum: [
-        "Electrician",
-        "Carpenter",
-        "AC Technician",
-        "Computer Technician",
-        "Plumber",
-        "General",
-      ],
-      default: "General",
-    },
+// ================= TECHNICIAN =================
+
+specialization: {
+  type: String,
+  enum: [
+    "Electrician",
+    "Carpenter",
+    "AC Technician",
+    "Computer Technician",
+    "Plumber",
+    "General",
+  ],
+  default: "General",
+},
+
+// Supervisor who created this technician
+createdBySupervisor: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "User",
+  default: null,
+},
 
     // ================= EMAIL OTP =================
 
