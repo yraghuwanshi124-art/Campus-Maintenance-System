@@ -4,7 +4,7 @@ import api from "../services/api";
 import { useNavigate } from "react-router-dom";
 
 const campusImages = [
-  "https://sunstoneprod.ctpl.io/images/sunstone_theme/Medicaps_University_IMAGE.jpeg",
+  "https://d3lzcn6mbbadaf.cloudfront.net/media/details/ANI-20260603124917.jpg",
 
   "https://www.medicaps.ac.in/uploads/school/medicaps-law-college.webp",
 
@@ -76,40 +76,106 @@ function Login() {
     <div className="relative min-h-screen overflow-hidden bg-slate-950">
 
       {/* BACKGROUND SLIDESHOW */}
-      {campusImages.map((image, index) => (
+      {/* {campusImages.map((image, index) => (
         <div
           key={image}
-          className={`absolute inset-0 bg-cover bg-center transition-opacity duration-[1500ms] ease-in-out ${
-            activeImage === index ? "opacity-100" : "opacity-0"
-          }`}
-          style={{ backgroundImage: `url("${image}")` }}
-        />
-      ))}
 
-{/* LIGHT OVERLAY - KEEP IMAGES CLEAR */}
-<div className="absolute inset-0 bg-gradient-to-r from-black/10 via-transparent to-black/10" />
+          className={`absolute inset-0 bg-cover bg-center transition-opacity duration-[1500ms] ease-in-out ${activeImage === index ? "opacity-100" : "opacity-0"
+            }`}
+          style={{ backgroundImage: `url("${image}")` }}
+
+
+          
+        />
+      ))} */}
+
+
+{/* // Zoom  */}
+
+      {campusImages.map((image, index) => (
+  <div
+    key={image}
+    className={`absolute inset-0 bg-cover bg-center transition-all duration-[2000ms] ease-in-out ${
+      activeImage === index
+        ? "scale-100 opacity-100"
+        : "scale-110 opacity-0"
+    }`}
+    style={{ backgroundImage: `url("${image}")` }}
+  />
+))}
+
+
+{/* Blur */}
+
+{/* {campusImages.map((image, index) => (
+  <div
+    key={image}
+    className={`absolute inset-0 bg-cover bg-center transition-all duration-[1500ms] ease-in-out ${
+      activeImage === index
+        ? "scale-100 opacity-100 blur-0"
+        : "scale-105 opacity-0 blur-md"
+    }`}
+    style={{ backgroundImage: `url("${image}")` }}
+  />
+))} */}
+
+
+{/* {campusImages.map((image, index) => (
+  <div
+    key={image}
+    className={`absolute inset-0 bg-cover bg-center transition-all duration-[3500ms] ease-in-out ${
+      activeImage === index
+        ? "scale-110 opacity-100"
+        : "scale-100 opacity-0"
+    }`}
+    style={{ backgroundImage: `url("${image}")` }}
+  />
+))} */}
+
+
+      {/* LIGHT OVERLAY - KEEP IMAGES CLEAR */}
+      <div className="absolute inset-0 bg-gradient-to-r from-black/10 via-transparent to-black/10" />
 
       {/* TOP BRANDING */}
       <div className="absolute left-0 right-0 top-0 z-20 flex items-center justify-between px-5 py-5 sm:px-10 lg:px-14">
 
-        <div className="flex items-center gap-3 rounded-2xl border border-white/20 bg-white/10 px-4 py-3 shadow-lg backdrop-blur-xl">
-          <img
-            src="https://www.medicaps.ac.in/public/frontend/images/medicaps-logo-fin.webp"
-            alt="Medi-Caps University"
-            className="h-16 w-auto object-contain shadow-none drop-shadow-none"
-          />
-        </div>
 
-        <div className="hidden rounded-full border border-white/20 bg-white/10 px-5 py-2.5 text-xs font-semibold tracking-[0.18em] text-white shadow-lg backdrop-blur-xl sm:block">
+
+<div className="flex items-center gap-4 rounded-2xl bg-white px-5 py-3">
+<img
+  src="https://www.medicaps.ac.in/public/frontend/images/medicaps-logo-fin.webp"
+  alt="Medi-Caps University Logo"
+  className="h-20 w-28 object-contain"
+  style={{
+    filter: "none",
+    boxShadow: "none",
+    WebkitFilter: "none",
+    transform: "scale(1.25)",
+  }}
+/>
+
+  <div className="border-l-2 border-slate-200 pl-4">
+    <p className="whitespace-nowrap text-base font-extrabold text-slate-900 sm:text-lg">
+      MediCaps University
+    </p>
+    <p className="mt-1 whitespace-nowrap text-xs font-semibold text-slate-600 sm:text-sm">
+      Indore, Madhya Pradesh
+    </p>
+  </div>
+</div>
+
+
+
+        {/* <div className="hidden rounded-full border border-white/20 bg-white/10 px-5 py-2.5 text-xs font-semibold tracking-[0.18em] text-white shadow-lg backdrop-blur-xl sm:block">
           CAMPUS MAINTENANCE PORTAL
-        </div>
+        </div> */}
 
       </div>
 
       {/* CENTER CONTENT */}
       <div className="relative z-10 flex min-h-screen items-center justify-end px-5 pb-20 pt-28 sm:px-10 lg:px-20">
 
-        <div className="w-full max-w-[460px] lg:mr-4">
+        <div className="w-full max-w-[500px] lg:mr-4">  
 
           {/* LOGIN CARD */}
           <div className="overflow-hidden rounded-[30px] border border-white/70 bg-white/95 shadow-[0_30px_100px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
@@ -117,7 +183,7 @@ function Login() {
             {/* CARD TOP ACCENT */}
             <div className="h-1.5 w-full bg-gradient-to-r from-indigo-600 via-violet-500 to-blue-500" />
 
-            <div className="p-7 sm:p-10">
+            <div className="p-8 sm:p-12">
 
               {/* CARD BRAND */}
               <div className="mb-8 text-center">
@@ -141,14 +207,11 @@ function Login() {
                 <p className="text-xs font-bold uppercase tracking-[0.22em] text-indigo-600">
                   Medi-Caps University
                 </p>
-
-                <h1 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
-                  Welcome Back
-                </h1>
-
+<h1 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
+  Campus Maintenance System
+</h1>
                 <p className="mt-3 text-sm leading-6 text-slate-500">
-                  Sign in to access your Campus Maintenance
-                  Management System.
+                  Sign in to access your campus maintenance portal.
                 </p>
 
               </div>
@@ -303,11 +366,10 @@ function Login() {
               {/* MESSAGE */}
               {message && (
                 <div
-                  className={`mt-5 rounded-xl px-4 py-3 text-center text-sm font-semibold ${
-                    message === "Login successful!"
+                  className={`mt-5 rounded-xl px-4 py-3 text-center text-sm font-semibold ${message === "Login successful!"
                       ? "bg-emerald-50 text-emerald-700"
                       : "bg-red-50 text-red-700"
-                  }`}
+                    }`}
                 >
                   {message}
                 </div>
@@ -334,11 +396,10 @@ function Login() {
                 type="button"
                 onClick={() => setActiveImage(index)}
                 aria-label={`Show campus image ${index + 1}`}
-                className={`h-1.5 rounded-full transition-all duration-500 ${
-                  activeImage === index
+                className={`h-1.5 rounded-full transition-all duration-500 ${activeImage === index
                     ? "w-8 bg-white"
                     : "w-2 bg-white/55 hover:bg-white"
-                }`}
+                  }`}
               />
             ))}
           </div>

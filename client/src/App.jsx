@@ -16,6 +16,7 @@ import AdminMonthlyReport from "./pages/AdminMonthlyReport";
 import AdminComplaints from "./pages/AdminComplaints";
 import AdminSettings from "./pages/AdminSettings";
 import AdminAIChatbot from "./pages/AdminAIChatbot";
+import AdminNotifications from "./pages/AdminNotifications";
 
 import SupervisorDashboard from "./pages/SupervisorDashboard";
 import SupervisorTechnicians from "./pages/SupervisorTechnicians";
@@ -31,7 +32,7 @@ import { ThemeProvider } from "./context/ThemeContext";
 
 // Supervisor Management
 import AdminSupervisors from "./pages/AdminSupervisors";
-
+import AdminFakeComplaints from "./pages/AdminFakeComplaints";
 function App() {
   return (
     <ThemeProvider>
@@ -114,6 +115,15 @@ function App() {
           />
 
           <Route
+            path="/admin/fake-complaints"
+            element={
+              <ProtectedRoute allowedRole="admin">
+                <AdminFakeComplaints />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/admin/settings"
             element={
               <ProtectedRoute allowedRole="admin">
@@ -136,6 +146,15 @@ function App() {
             element={
               <ProtectedRoute allowedRole="admin">
                 <AdminSupervisors />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin/notifications"
+            element={
+              <ProtectedRoute allowedRole="admin">
+                <AdminNotifications />
               </ProtectedRoute>
             }
           />
@@ -188,7 +207,14 @@ function App() {
               </ProtectedRoute>
             }
           />
-
+          <Route
+            path="/student/notifications"
+            element={
+              <ProtectedRoute allowedRole="student">
+                <StudentDashboard />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/supervisor/ai-chatbot"
             element={

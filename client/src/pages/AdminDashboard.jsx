@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import api from "../services/api";
 import LogoutModal from "../components/LogoutModal";
 import AdminSidebar from "../components/AdminSidebar";
+import NotificationBell from "../components/NotificationBell";
 import { useTheme } from "../context/ThemeContext";
 
 function AdminDashboard() {
@@ -802,6 +803,8 @@ const user = JSON.parse(localStorage.getItem("user"));
             </div>
 
             <div className="flex items-center gap-4">
+              <NotificationBell role="admin" />
+
               <div className="hidden text-right sm:block">
                 <p
                   className={`text-base font-bold ${darkMode ? "text-white" : "text-slate-800"

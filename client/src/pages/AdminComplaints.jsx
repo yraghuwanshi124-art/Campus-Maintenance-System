@@ -192,6 +192,60 @@ function AdminComplaints() {
     }
   };
 
+
+  // ================= MARK COMPLAINT AS FAKE =================
+
+  const markComplaintAsFake = async (complaintId) => {
+    const confirmed = window.confirm(
+      "Are you sure this complaint has been verified as fake?\n\nThe complaint will be moved to Fake Complaints and a warning notification and email will be sent to the student."
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const token = localStorage.getItem("token");
+
+      const response = await api.patch(
+        `/complaints/${complaintId}/fake`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      alert(
+        response.data.message ||
+        "Complaint marked as fake successfully."
+      );
+
+      // Remove from All Complaints without deleting database record
+      setComplaints((prev) =>
+        prev.filter((complaint) => complaint._id !== complaintId)
+      );
+
+      setExpandedComplaints((prev) => {
+        const updated = { ...prev };
+        delete updated[complaintId];
+        return updated;
+      });
+
+      setSelectedSupervisors((prev) => {
+        const updated = { ...prev };
+        delete updated[complaintId];
+        return updated;
+      });
+
+    } catch (error) {
+      alert(
+        error.response?.data?.message ||
+        "Failed to mark complaint as fake."
+      );
+    }
+  };
+
+
   // ================= STATUS STYLE =================
 
   const getStatusStyle = (status) => {
@@ -1155,6 +1209,17 @@ function AdminComplaints() {
                               </div>
                             </div>
                           )}
+
+
+  {/* MARK AS FAKE */}
+
+  <button
+    onClick={() => markComplaintAsFake(complaint._id)}
+    className="rounded-xl border border-red-200 bg-red-50 px-6 py-3.5 text-sm font-bold text-red-700 shadow-sm transition hover:bg-red-600 hover:text-white hover:shadow-lg active:scale-[0.98] dark:border-red-900 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-600 dark:hover:text-white"
+  >
+    ⚠️ Mark as Fake
+  </button>
+
 
                           {/* DELETE */}
 

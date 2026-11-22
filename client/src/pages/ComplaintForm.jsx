@@ -587,13 +587,13 @@ function ComplaintForm({ darkMode }) {
         <nav className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/90">
           <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3.5 sm:px-6 lg:px-8">
             <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-              <div className="flex h-12 items-center rounded-xl border border-slate-100 bg-white px-2.5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              {/* <div className="flex h-12 items-center rounded-xl border border-slate-100 bg-white px-2.5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
                 <img
                   src="https://www.medicaps.ac.in/public/frontend/images/medicaps-logo-fin.webp"
                   alt="Medi-Caps University"
                   className="h-8 w-auto object-contain sm:h-9"
                 />
-              </div>
+              </div> */}
 
               <div className="min-w-0 border-l border-slate-200 pl-3 dark:border-slate-700 sm:pl-4">
                 <p className="truncate text-lg font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-xl">

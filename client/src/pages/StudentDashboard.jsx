@@ -7,7 +7,8 @@ import ComplaintForm from "./ComplaintForm";
 import MyComplaints from "./MyComplaints";
 import CampusFixChatbot from "../components/CampusFixChatbot";
 import { useTheme } from "../context/ThemeContext";
-
+import NotificationBell from "../components/NotificationBell";
+import StudentNotifications from "./StudentNotifications";
 
 function StudentDashboard() {
   const navigate = useNavigate();
@@ -28,11 +29,13 @@ function StudentDashboard() {
     localStorage.getItem("campusfix_student_profile_image") || ""
   );
 
-  const currentSection =
-    location.pathname === "/student/report"
-      ? "report"
-      : location.pathname === "/student/complaints"
-        ? "complaints"
+const currentSection =
+  location.pathname === "/student/report"
+    ? "report"
+    : location.pathname === "/student/complaints"
+      ? "complaints"
+      : location.pathname === "/student/notifications"
+        ? "notifications"
         : new URLSearchParams(location.search).get("section") ||
         "dashboard";
 
@@ -295,6 +298,7 @@ function StudentDashboard() {
                       : "border-white bg-indigo-50"
                       } shadow-lg`}
                   >
+                    
                     {profileImage ? (
                       <img
                         src={profileImage}
@@ -1153,7 +1157,9 @@ const renderContent = () => {
   if (location.pathname === "/student/complaints" || currentSection === "complaints") {
     return <MyComplaints darkMode={darkMode} />;
   }
-
+if (currentSection === "notifications") {
+  return <StudentNotifications darkMode={darkMode} />;
+}
   if (currentSection === "profile") {
     return renderProfile();
   }
@@ -1366,6 +1372,7 @@ const renderContent = () => {
             </div>
 
             <div className="flex shrink-0 items-center gap-3">
+              <NotificationBell role="student" />
               <div className="hidden text-right sm:block">
                 <p
                   className={`text-xl font-bold ${darkMode

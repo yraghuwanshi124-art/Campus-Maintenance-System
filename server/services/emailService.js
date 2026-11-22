@@ -350,6 +350,75 @@ const sendPasswordResetOTP = async (email, otp) => {
   }
 };
 
+
+// ================= FAKE COMPLAINT WARNING =================
+
+const sendFakeComplaintWarningEmail = async (studentEmail, studentName) => {
+  try {
+    await transporter.sendMail({
+      from: `"CampusFix" <${process.env.EMAIL_USER}>`,
+      to: studentEmail,
+      subject: "Important Warning – Fake Complaint Detected",
+
+      html: `
+        <div style="
+          font-family: Arial, sans-serif;
+          max-width: 600px;
+          margin: auto;
+          padding: 25px;
+          border: 1px solid #e5e7eb;
+          border-radius: 12px;
+          color: #1f2937;
+        ">
+
+          <h2 style="color: #dc2626;">
+            Important Warning – Fake Complaint Detected
+          </h2>
+
+          <p>Dear ${studentName || "Student"},</p>
+
+          <p>
+            Your submitted maintenance complaint has been reviewed
+            and verified as false by the administration.
+          </p>
+
+          <p>
+            We request you not to submit false complaints, as this
+            wastes the valuable time and resources of college staff.
+          </p>
+
+          <p>
+            Repeated incidents may lead to disciplinary action
+            according to college rules.
+          </p>
+
+          <p>
+            If you believe this decision is incorrect, you may
+            contact the college administration for clarification.
+          </p>
+
+          <br />
+
+          <p>Regards,</p>
+          <strong>College Administration</strong>
+
+          <hr />
+
+          <p style="color: #9ca3af; font-size: 12px;">
+            This is an automated email from CampusFix.
+          </p>
+
+        </div>
+      `,
+    });
+
+    console.log("Fake complaint warning email sent successfully");
+  } catch (error) {
+    console.error("Fake complaint warning email failed:", error.message);
+  }
+};
+
+
 // ================= EXPORTS =================
 
 module.exports = {
@@ -358,4 +427,5 @@ module.exports = {
   sendComplaintResolvedEmail,
   sendVerificationOTP,
   sendPasswordResetOTP,
+  sendFakeComplaintWarningEmail,
 };

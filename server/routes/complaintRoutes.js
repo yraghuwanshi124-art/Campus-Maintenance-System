@@ -12,6 +12,8 @@ const {
   deleteComplaint,
   uploadCompletionPhoto,
   submitFeedback,
+  markComplaintAsFake,
+  getFakeComplaints,
 } = require("../controllers/complaintController");
 
 const protect = require("../middleware/authMiddleware");
@@ -40,6 +42,24 @@ router.post(
   allowRoles("student"),
   submitFeedback
 );
+
+// Get fake complaints - Admin
+router.get(
+  "/fake",
+  protect,
+  allowRoles("admin"),
+  getFakeComplaints
+);
+
+// Mark complaint as fake - Admin
+router.patch(
+  "/:id/fake",
+  protect,
+  allowRoles("admin"),
+  markComplaintAsFake
+);
+
+
 
 // Get all complaints - Admin
 router.get(

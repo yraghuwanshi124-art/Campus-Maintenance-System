@@ -8,6 +8,8 @@ const {
   getSupervisorComplaints,
   getTechniciansForSupervisor,
   assignTechnician,
+    setComplaintDeadline,
+  verifyComplaint,
 } = require("../controllers/supervisorController");
 
 const protect = require("../middleware/authMiddleware");
@@ -69,6 +71,20 @@ router.patch(
   protect,
   allowRoles("supervisor"),
   assignTechnician
+);
+
+router.patch(
+  "/complaints/:id/deadline",
+  protect,
+  allowRoles("supervisor"),
+  setComplaintDeadline
+);
+
+router.patch(
+  "/complaints/:id/verify",
+  protect,
+  allowRoles("supervisor"),
+  verifyComplaint
 );
 
 module.exports = router;

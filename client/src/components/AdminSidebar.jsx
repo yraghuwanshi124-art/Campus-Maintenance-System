@@ -29,6 +29,11 @@ const menuItems = [
     icon: "▤",
   },
   {
+  name: "Fake Complaints",
+  path: "/admin/fake-complaints",
+  icon: "⚠️",
+},
+  {
     name: "Supervisor Management",
     path: "/admin/supervisors",
     icon: "👨‍💼",
@@ -227,7 +232,7 @@ const menuItems = [
           } ${isOpen ? "p-4" : "p-2"}`}
         >
           {/* Admin Profile / System Status */}
-          {isOpen && (
+          {/* {isOpen && (
             <div
               className={`mb-3 rounded-2xl border p-3.5 ${
                 darkMode
@@ -259,7 +264,7 @@ const menuItems = [
                 </div>
               </div>
             </div>
-          )}
+          )} */}
 
           {/* Dark / Light Mode Toggle */}
           <button

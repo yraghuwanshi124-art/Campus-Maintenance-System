@@ -1,1011 +1,835 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 
-function Register() {
-const navigate = useNavigate();
-
-// ================= STEP =================
-
-const [step, setStep] = useState(1);
-
-// ================= STUDENT DETAILS =================
-
-const [name, setName] = useState("");
-const [enrollmentNumber, setEnrollmentNumber] = useState("");
-const [email, setEmail] = useState("");
-const [phoneNumber, setPhoneNumber] = useState("");
-const [department, setDepartment] = useState("");
-const [branch , setBranch] = useState("");
-const [semester, setSemester] = useState("");
-const [classSection, setClassSection] = useState("");
-
-// ================= OTP =================
-
-const [emailOTP, setEmailOTP] = useState("");
-
-// ================= PASSWORD =================
-
-const [password, setPassword] = useState("");
-const [confirmPassword, setConfirmPassword] = useState("");
-
-const [showPassword, setShowPassword] = useState(false);
-const [showConfirmPassword, setShowConfirmPassword] =
-    useState(false);
-
-// ================= UI =================
-
-const [message, setMessage] = useState("");
-const [loading, setLoading] = useState(false);
-
-// ================= PASSWORD REQUIREMENTS =================
-
-const passwordRequirements = [
-    {
-        id: "length",
-        label: "At least 8 characters",
-        met: password.length >= 8,
-    },
-    {
-        id: "uppercase",
-        label: "At least 1 uppercase letter (A-Z)",
-        met: /[A-Z]/.test(password),
-    },
-    {
-        id: "lowercase",
-        label: "At least 1 lowercase letter (a-z)",
-        met: /[a-z]/.test(password),
-    },
-    {
-        id: "number",
-        label: "At least 1 number (0-9)",
-        met: /[0-9]/.test(password),
-    },
-    {
-        id: "special",
-        label: "At least 1 special character (@, #, $, %, etc.)",
-        met: /[^A-Za-z0-9]/.test(password),
-    },
+const campusImages = [
+  "https://d3lzcn6mbbadaf.cloudfront.net/media/details/ANI-20260603124917.jpg",
+  "https://www.medicaps.ac.in/uploads/school/medicaps-law-college.webp",
+  "https://image-static.collegedunia.com/public/college_data/images/campusimage/1745581929Pictue-33.jpg",
+  "https://www.knimbus.com/static-content/org_41ec1a01-e4f6-419d-906b-b90888112aa7/org_41ec1a01-e4f6-419d-906b-b90888112aa7_cover.jpeg",
 ];
 
-const isPasswordStrong = passwordRequirements.every(
-    (req) => req.met
-);
+const logoUrl =
+  "https://www.medicaps.ac.in/public/frontend/images/medicaps-logo-fin.webp";
 
-const passwordsMatch =
-    confirmPassword.length > 0 &&
-    password === confirmPassword;
+const inputClass =
+  "w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10";
 
-const passwordsMismatch =
-    confirmPassword.length > 0 &&
-    password !== confirmPassword;
+const labelClass = "mb-1.5 block text-sm font-medium text-slate-700";
 
-// ================= MESSAGE =================
-
-const showError = (text) => {
-    setMessage(text);
+const initialForm = {
+  name: "",
+  enrollmentNumber: "",
+  email: "",
+  phoneNumber: "",
+  department: "",
+  branch: "",
+  semester: "",
+  classSection: "",
 };
 
-// ================= STEP 1 =================
-// STUDENT DETAILS + SEND EMAIL OTP
+function FormField({
+  label,
+  name,
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+}) {
+  return (
+    <div className="min-w-0">
+      <label htmlFor={name} className={labelClass}>
+        {label} <span className="text-red-500">*</span>
+      </label>
 
-const handleRegister = async (e) => {
-    e.preventDefault();
+      <input
+        id={name}
+        name={name}
+        type={type}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        className={inputClass}
+        required
+      />
+    </div>
+  );
+}
 
+function Register() {
+  const navigate = useNavigate();
+
+  const [step, setStep] = useState(1);
+  const [form, setForm] = useState(initialForm);
+
+  const [emailOTP, setEmailOTP] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+
+  const [currentImage, setCurrentImage] = useState(0);
+
+  // Campus slideshow
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentImage((prev) => (prev + 1) % campusImages.length);
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+
+    setForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const clearMessages = () => {
+    setError("");
     setMessage("");
+  };
 
-    // Name
-    if (!name.trim()) {
-        showError("Please enter your full name.");
-        return;
+  const showError = (text) => {
+    setError(text);
+    setMessage("");
+  };
+
+  const showSuccess = (text) => {
+    setMessage(text);
+    setError("");
+  };
+
+  // Password requirements
+  const passwordChecks = [
+    { label: "8 characters", valid: password.length >= 8 },
+    { label: "Uppercase letter", valid: /[A-Z]/.test(password) },
+    { label: "Lowercase letter", valid: /[a-z]/.test(password) },
+    { label: "One number", valid: /\d/.test(password) },
+    {
+      label: "Special character",
+      valid: /[^A-Za-z0-9]/.test(password),
+    },
+  ];
+
+  const passwordStrength = passwordChecks.filter(
+    (item) => item.valid
+  ).length;
+
+  // Validate student details
+  const validateDetails = () => {
+    if (!form.name.trim()) {
+      showError("Please enter your full name.");
+      return false;
     }
 
-    // Enrollment
+    if (!/^[A-Za-z0-9]+$/.test(form.enrollmentNumber.trim())) {
+      showError("Please enter a valid enrollment number.");
+      return false;
+    }
+
     if (
-        !/^[A-Za-z0-9]+$/.test(
-            enrollmentNumber.trim()
-        )
+      !form.email.trim().toLowerCase().endsWith("@medicaps.ac.in")
     ) {
-        showError("Please enter a valid enrollment number.");
-        return;
+      showError("Please use your official Medi-Caps email address.");
+      return false;
     }
 
-    // Email
-    if (
-        !email
-            .trim()
-            .toLowerCase()
-            .endsWith("@medicaps.ac.in")
-    ) {
-        showError(
-            "Please use your Medi-Caps college email."
-        );
-        return;
-    }
-
-    // Phone
-    const normalizedPhone = phoneNumber
-        .replace(/\s+/g, "")
-        .trim();
+    const normalizedPhone = form.phoneNumber.replace(/\D/g, "");
 
     if (!/^[6-9]\d{9}$/.test(normalizedPhone)) {
-        showError(
-            "Please enter a valid 10-digit Indian mobile number."
-        );
-        return;
+      showError("Please enter a valid 10-digit mobile number.");
+      return false;
     }
 
-    // Department
-    if (!department.trim()) {
-        showError("Please enter your department.");
-        return;
+    if (!form.department.trim()) {
+      showError("Please enter your department.");
+      return false;
     }
 
-    if(!branch.trim()) {
-        showError("Please enter your branch.");
-        return;
+    if (!form.branch.trim()) {
+      showError("Please enter your branch.");
+      return false;
     }
 
-    // Semester
-    if (!semester) {
-        showError("Please select your semester.");
-        return;
+    if (!form.semester) {
+      showError("Please select your semester.");
+      return false;
     }
 
-    // Section
-    if (!classSection.trim()) {
-        showError("Please enter your class / section.");
-        return;
+    if (!form.classSection.trim()) {
+      showError("Please enter your class section.");
+      return false;
     }
 
-    setLoading(true);
+    return true;
+  };
+
+  // STEP 1: Register details and send OTP
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    clearMessages();
+
+    if (!validateDetails()) return;
 
     try {
-        const response = await api.post(
-            "/auth/register",
-            {
-                name: name.trim(),
+      setLoading(true);
 
-                enrollmentNumber:
-                    enrollmentNumber
-                        .trim()
-                        .toUpperCase(),
+      const normalizedPhone = form.phoneNumber.replace(/\D/g, "");
 
-                email: email
-                    .trim()
-                    .toLowerCase(),
+      await api.post("/auth/register", {
+        name: form.name.trim(),
+        enrollmentNumber: form.enrollmentNumber.trim().toUpperCase(),
+        email: form.email.trim().toLowerCase(),
+        phoneNumber: normalizedPhone,
+        department: form.department.trim(),
+        branch: form.branch.trim(),
+        semester: Number(form.semester),
+        classSection: form.classSection.trim(),
+      });
 
-                phoneNumber: normalizedPhone,
+      showSuccess("OTP sent successfully to your college email.");
 
-                department:
-                    department.trim(),
-                
-                branch:
-                    branch.trim(),
-
-                semester: Number(semester),
-
-                classSection:
-                    classSection.trim(),
-            }
-        );
-
-        setMessage(
-            response.data?.message ||
-            "Email OTP sent successfully."
-        );
-
+      setTimeout(() => {
         setStep(2);
-    } catch (error) {
-        setMessage(
-            error.response?.data?.message ||
-            "Unable to start registration."
-        );
+        clearMessages();
+      }, 700);
+    } catch (err) {
+      showError(
+        err.response?.data?.message ||
+          "Unable to send OTP. Please try again."
+      );
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
-};
+  };
 
-// ================= STEP 2 =================
-// VERIFY EMAIL OTP
-
-const handleVerifyEmailOTP = async (e) => {
+  // STEP 2: Verify OTP
+  const handleVerifyOTP = async (e) => {
     e.preventDefault();
+    clearMessages();
 
-    setMessage("");
-
-    if (!emailOTP.trim()) {
-        showError("Please enter the email OTP.");
-        return;
+    if (!/^\d{6}$/.test(emailOTP.trim())) {
+      showError("Please enter a valid 6-digit OTP.");
+      return;
     }
-
-    if (emailOTP.trim().length !== 6) {
-        showError("Email OTP must be 6 digits.");
-        return;
-    }
-
-    setLoading(true);
 
     try {
-        const response = await api.post(
-            "/auth/verify-otp",
-            {
-                email: email
-                    .trim()
-                    .toLowerCase(),
+      setLoading(true);
 
-                otp: emailOTP.trim(),
-            }
-        );
+      await api.post("/auth/verify-otp", {
+        email: form.email.trim().toLowerCase(),
+        otp: emailOTP.trim(),
+      });
 
-        setMessage(
-            response.data?.message ||
-            "Email verified successfully. Create your password."
-        );
+      showSuccess("Email verified successfully!");
 
+      setTimeout(() => {
         setStep(3);
-    } catch (error) {
-        setMessage(
-            error.response?.data?.message ||
-            "Email OTP verification failed."
-        );
+        clearMessages();
+      }, 700);
+    } catch (err) {
+      showError(
+        err.response?.data?.message ||
+          "Invalid OTP. Please try again."
+      );
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
-};
+  };
 
-// ================= STEP 3 =================
-// CREATE PASSWORD + ACCOUNT
-
-const handleCreateAccount = async (e) => {
+  // STEP 3: Complete registration
+  const handleCompleteRegistration = async (e) => {
     e.preventDefault();
+    clearMessages();
 
-    setMessage("");
-
-    if (!isPasswordStrong) {
-        showError(
-            "Please satisfy all password requirements."
-        );
-        return;
+    if (passwordStrength !== 5) {
+      showError("Please fulfill all password requirements.");
+      return;
     }
 
     if (password !== confirmPassword) {
-        showError("Passwords do not match.");
-        return;
+      showError("Passwords do not match.");
+      return;
     }
-
-    setLoading(true);
 
     try {
-        const response = await api.post(
-            "/auth/complete-registration",
-            {
-                email: email
-                    .trim()
-                    .toLowerCase(),
+      setLoading(true);
 
-                password,
+      await api.post("/auth/complete-registration", {
+        email: form.email.trim().toLowerCase(),
+        password,
+        confirmPassword,
+      });
 
-                confirmPassword,
-            }
-        );
+      showSuccess("Account created successfully! Redirecting to login...");
 
-        setMessage(
-            response.data?.message ||
-            "Account created successfully."
-        );
-
-        setTimeout(() => {
-            navigate("/");
-        }, 1200);
-    } catch (error) {
-        setMessage(
-            error.response?.data?.message ||
-            "Unable to create account."
-        );
+      setTimeout(() => {
+        navigate("/");
+      }, 1200);
+    } catch (err) {
+      showError(
+        err.response?.data?.message ||
+          "Unable to complete registration. Please try again."
+      );
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
-};
-
-// ================= BACK BUTTON =================
-
-const handleBack = () => {
-    setMessage("");
-
-    if (step === 2) {
-        setEmailOTP("");
-        setStep(1);
-        return;
-    }
-
-    if (step === 3) {
-        setPassword("");
-        setConfirmPassword("");
-        setStep(2);
-    }
-};
-
-// ================= STEP TITLE =================
-
-const getStepTitle = () => {
-    if (step === 1) {
-        return "Student Details";
-    }
-
-    if (step === 2) {
-        return "Verify College Email";
-    }
-
-    return "Create Password";
-};
-
-// ================= RENDER =================
-
-return (
-    <div className="min-h-screen bg-slate-100 flex items-center justify-center px-5 py-10">
-
-        <div className="w-full max-w-md">
-
-            <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-xl sm:p-10">
-
-                {/* Header */}
-
-                <div className="mb-7 text-center">
-
-                    <h1 className="text-3xl font-bold text-slate-800">
-                        Create Account
-                    </h1>
-
-                    <p className="mt-2 text-sm text-slate-500">
-                        {getStepTitle()}
-                    </p>
-
-                </div>
-
-                {/* Progress */}
-
-                <div className="mb-8">
-
-                    <div className="flex items-center justify-center">
-
-                        {[1, 2, 3].map((number) => (
-                            <div
-                                key={number}
-                                className="flex items-center"
-                            >
-
-                                <div
-                                    className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${
-                                        step >= number
-                                            ? "bg-indigo-600 text-white"
-                                            : "bg-slate-200 text-slate-500"
-                                    }`}
-                                >
-                                    {number}
-                                </div>
-
-                                {number < 3 && (
-                                    <div
-                                        className={`h-1 w-12 sm:w-20 ${
-                                            step > number
-                                                ? "bg-indigo-600"
-                                                : "bg-slate-200"
-                                        }`}
-                                    />
-                                )}
-
-                            </div>
-                        ))}
-
-                    </div>
-
-                    <div className="mt-2 flex justify-center gap-10 text-[10px] font-semibold text-slate-400 sm:gap-16">
-                        <span>Details</span>
-                        <span>Email OTP</span>
-                        <span>Password</span>
-                    </div>
-
-                </div>
-
-                {/* ================= STEP 1 ================= */}
-
-                {step === 1 && (
-                    <form
-                        onSubmit={handleRegister}
-                        className="space-y-5"
-                    >
-
-                        {/* Full Name */}
-
-                        <div>
-                            <label className="mb-2 block font-semibold text-slate-700">
-                                Full Name
-                            </label>
-
-                            <input
-                                type="text"
-                                placeholder="Enter your full name"
-                                value={name}
-                                onChange={(e) =>
-                                    setName(e.target.value)
-                                }
-                                required
-                                className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 outline-none focus:border-indigo-500 focus:bg-white"
-                            />
-                        </div>
-
-                        {/* Enrollment Number */}
-
-                        <div>
-                            <label className="mb-2 block font-semibold text-slate-700">
-                                Enrollment Number
-                            </label>
-
-                            <input
-                                type="text"
-                                placeholder="e.g. EN25CS3090250"
-                                value={enrollmentNumber}
-                                onChange={(e) =>
-                                    setEnrollmentNumber(
-                                        e.target.value.toUpperCase()
-                                    )
-                                }
-                                required
-                                className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 uppercase outline-none focus:border-indigo-500 focus:bg-white"
-                            />
-
-                            <p className="mt-1 text-xs text-slate-500">
-                                Enter your official college enrollment number
-                            </p>
-                        </div>
-
-                        {/* Department */}
-
-                        <div>
-                            <label className="mb-2 block font-semibold text-slate-700">
-                                Department
-                            </label>
-
-                            <input
-                                type="text"
-                                placeholder="e.g. Computer Science"
-                                value={department}
-                                onChange={(e) =>
-                                    setDepartment(
-                                        e.target.value
-                                    )
-                                }
-                                required
-                                className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 outline-none focus:border-indigo-500 focus:bg-white"
-                            />
-                        </div>
-
-                        {/* Branch */}
-                        <div>
-                            <label className="mb-2 block font-semibold text-slate-700">
-                                Branch
-                            </label>
-                            <input type="text" 
-                            placeholder="e.g. AI (IBM)"
-                            onChange={(e) => 
-                                setBranch(
-                                    e.target.value
-                                )
-                            }
-                            required
-                            className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 outline-none focus:border-indigo-500 focus:bg-white"
-                            />
-                        </div>
-
-                        {/* Semester */}
-
-                        <div>
-                            <label className="mb-2 block font-semibold text-slate-700">
-                                Semester
-                            </label>
-
-                            <select
-                                value={semester}
-                                onChange={(e) =>
-                                    setSemester(
-                                        e.target.value
-                                    )
-                                }
-                                required
-                                className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 outline-none focus:border-indigo-500 focus:bg-white"
-                            >
-                                <option value="">
-                                    Select Semester
-                                </option>
-
-                                {[1, 2, 3, 4, 5, 6, 7, 8].map(
-                                    (sem) => (
-                                        <option
-                                            key={sem}
-                                            value={sem}
-                                        >
-                                            {sem}
-                                            {sem === 1
-                                                ? "st"
-                                                : sem === 2
-                                                ? "nd"
-                                                : sem === 3
-                                                ? "rd"
-                                                : "th"}{" "}
-                                            Semester
-                                        </option>
-                                    )
-                                )}
-                            </select>
-                        </div>
-
-                        {/* Class / Section */}
-
-                        <div>
-                            <label className="mb-2 block font-semibold text-slate-700">
-                                Class / Section
-                            </label>
-
-                            <input
-                                type="text"
-                                placeholder="e.g. IBM-C"
-                                value={classSection}
-                                onChange={(e) =>
-                                    setClassSection(
-                                        e.target.value
-                                    )
-                                }
-                                required
-                                className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 outline-none focus:border-indigo-500 focus:bg-white"
-                            />
-                        </div>
-
-                        {/* Phone Number */}
-
-                        <div>
-                            <label className="mb-2 block font-semibold text-slate-700">
-                                Phone Number
-                            </label>
-
-                            <input
-                                type="tel"
-                                inputMode="numeric"
-                                maxLength={10}
-                                placeholder="Enter 10-digit mobile number"
-                                value={phoneNumber}
-                                onChange={(e) =>
-                                    setPhoneNumber(
-                                        e.target.value.replace(
-                                            /\D/g,
-                                            ""
-                                        )
-                                    )
-                                }
-                                required
-                                className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 outline-none focus:border-indigo-500 focus:bg-white"
-                            />
-
-                            <p className="mt-1 text-xs text-slate-500">
-                                Phone verification will be added later.
-                            </p>
-                        </div>
-
-                        {/* College Email */}
-
-                        <div>
-                            <label className="mb-2 block font-semibold text-slate-700">
-                                College Email
-                            </label>
-
-                            <input
-                                type="email"
-                                placeholder="enrollment@medicaps.ac.in"
-                                value={email}
-                                onChange={(e) =>
-                                    setEmail(
-                                        e.target.value
-                                    )
-                                }
-                                required
-                                className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 outline-none focus:border-indigo-500 focus:bg-white"
-                            />
-
-                            <p className="mt-1 text-xs text-slate-500">
-                                Use your @medicaps.ac.in email
-                            </p>
-                        </div>
-
-                        {/* Info */}
-
-                        <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-700">
-                            Your Medi-Caps email will be verified using a one-time OTP before you create your password.
-                        </div>
-
-                        {/* Continue */}
-
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full rounded-xl bg-indigo-600 px-5 py-3.5 font-bold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                            {loading
-                                ? "Sending OTP..."
-                                : "Continue & Send Email OTP"}
-                        </button>
-
-                    </form>
-                )}
-
-                {/* ================= STEP 2 ================= */}
-
-                {step === 2 && (
-                    <form
-                        onSubmit={handleVerifyEmailOTP}
-                        className="space-y-5"
-                    >
-
-                        <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-5 text-center">
-
-                            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-2xl">
-                                ✉️
-                            </div>
-
-                            <h2 className="font-bold text-slate-800">
-                                Verify your college email
-                            </h2>
-
-                            <p className="mt-1 text-sm text-slate-500">
-                                Enter the 6-digit OTP sent to your Medi-Caps email.
-                            </p>
-
-                            <p className="mt-2 break-all text-xs font-semibold text-slate-600">
-                                {email}
-                            </p>
-
-                        </div>
-
-                        <div>
-                            <label className="mb-2 block font-semibold text-slate-700">
-                                Email OTP
-                            </label>
-
-                            <input
-                                type="text"
-                                inputMode="numeric"
-                                maxLength={6}
-                                placeholder="Enter 6-digit OTP"
-                                value={emailOTP}
-                                onChange={(e) =>
-                                    setEmailOTP(
-                                        e.target.value.replace(
-                                            /\D/g,
-                                            ""
-                                        )
-                                    )
-                                }
-                                required
-                                className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 text-center text-xl font-bold tracking-[0.4em] outline-none focus:border-indigo-500 focus:bg-white"
-                            />
-                        </div>
-
-                        <button
-                            type="submit"
-                            disabled={
-                                loading ||
-                                emailOTP.length !== 6
-                            }
-                            className="w-full rounded-xl bg-indigo-600 px-5 py-3.5 font-bold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                            {loading
-                                ? "Verifying..."
-                                : "Verify Email"}
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={handleBack}
-                            disabled={loading}
-                            className="w-full rounded-xl border border-slate-300 bg-white px-5 py-3 font-semibold text-slate-700 hover:bg-slate-50"
-                        >
-                            ← Back
-                        </button>
-
-                    </form>
-                )}
-
-                {/* ================= STEP 3 ================= */}
-
-                {step === 3 && (
-                    <form
-                        onSubmit={handleCreateAccount}
-                        className="space-y-5"
-                    >
-
-                        <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-5 text-center">
-
-                            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-2xl">
-                                ✓
-                            </div>
-
-                            <h2 className="font-bold text-slate-800">
-                                Email Verified
-                            </h2>
-
-                            <p className="mt-1 text-sm text-slate-500">
-                                Your college email has been verified. Now create your CampusFix password.
-                            </p>
-
-                        </div>
-
-                        {/* Create Password */}
-
-                        <div>
-
-                            <label className="mb-2 block font-semibold text-slate-700">
-                                Create Password
-                            </label>
-
-                            <div className="relative">
-
-                                <input
-                                    type={
-                                        showPassword
-                                            ? "text"
-                                            : "password"
-                                    }
-                                    placeholder="Create a strong password"
-                                    value={password}
-                                    onChange={(e) =>
-                                        setPassword(
-                                            e.target.value
-                                        )
-                                    }
-                                    required
-                                    className={`w-full rounded-xl border bg-slate-50 px-4 py-3 pr-12 outline-none transition focus:bg-white ${
-                                        password.length > 0
-                                            ? isPasswordStrong
-                                                ? "border-emerald-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                                                : "border-amber-300 focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
-                                            : "border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-                                    }`}
-                                />
-
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        setShowPassword(
-                                            !showPassword
-                                        )
-                                    }
-                                    className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-200 hover:text-indigo-600"
-                                >
-                                    {showPassword
-                                        ? "◉"
-                                        : "○"}
-                                </button>
-
-                            </div>
-
-                            {/* Password Requirements */}
-
-                            <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-
-                                <div className="mb-2.5 flex items-center justify-between">
-
-                                    <p className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                                        Password requirements:
-                                    </p>
-
-                                    <span
-                                        className={`text-xs font-bold ${
-                                            isPasswordStrong
-                                                ? "text-emerald-600"
-                                                : "text-slate-400"
-                                        }`}
-                                    >
-                                        {
-                                            passwordRequirements.filter(
-                                                (r) =>
-                                                    r.met
-                                            ).length
-                                        }{" "}
-                                        / 5 met
-                                    </span>
-
-                                </div>
-
-                                <div className="space-y-1.5 text-xs">
-
-                                    {passwordRequirements.map(
-                                        (req) => (
-                                            <div
-                                                key={req.id}
-                                                className={`flex items-center gap-2 ${
-                                                    req.met
-                                                        ? "font-medium text-emerald-700"
-                                                        : "text-slate-500"
-                                                }`}
-                                            >
-
-                                                <span
-                                                    className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
-                                                        req.met
-                                                            ? "bg-emerald-100 text-emerald-700"
-                                                            : "bg-slate-200 text-slate-400"
-                                                    }`}
-                                                >
-                                                    {req.met
-                                                        ? "✓"
-                                                        : "✗"}
-                                                </span>
-
-                                                <span>
-                                                    {req.label}
-                                                </span>
-
-                                            </div>
-                                        )
-                                    )}
-
-                                </div>
-
-                            </div>
-
-                        </div>
-
-                        {/* Confirm Password */}
-
-                        <div>
-
-                            <label className="mb-2 block font-semibold text-slate-700">
-                                Re-enter Password
-                            </label>
-
-                            <div className="relative">
-
-                                <input
-                                    type={
-                                        showConfirmPassword
-                                            ? "text"
-                                            : "password"
-                                    }
-                                    placeholder="Re-enter your password"
-                                    value={confirmPassword}
-                                    onChange={(e) =>
-                                        setConfirmPassword(
-                                            e.target.value
-                                        )
-                                    }
-                                    required
-                                    className={`w-full rounded-xl border bg-slate-50 px-4 py-3 pr-12 outline-none transition focus:bg-white ${
-                                        passwordsMismatch
-                                            ? "border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-100"
-                                            : passwordsMatch
-                                            ? "border-emerald-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                                            : "border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-                                    }`}
-                                />
-
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        setShowConfirmPassword(
-                                            !showConfirmPassword
-                                        )
-                                    }
-                                    className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-200 hover:text-indigo-600"
-                                >
-                                    {showConfirmPassword
-                                        ? "◉"
-                                        : "○"}
-                                </button>
-
-                            </div>
-
-                            {confirmPassword && (
-                                <p
-                                    className={`mt-1.5 flex items-center gap-1.5 text-xs font-semibold ${
-                                        passwordsMatch
-                                            ? "text-emerald-600"
-                                            : "text-red-500"
-                                    }`}
-                                >
-                                    <span>
-                                        {passwordsMatch
-                                            ? "✓"
-                                            : "✗"}
-                                    </span>
-
-                                    <span>
-                                        {passwordsMatch
-                                            ? "Passwords match"
-                                            : "Passwords do not match"}
-                                    </span>
-                                </p>
-                            )}
-
-                        </div>
-
-                        {/* Create Account */}
-
-                        <button
-                            type="submit"
-                            disabled={
-                                loading ||
-                                !isPasswordStrong ||
-                                password !==
-                                    confirmPassword
-                            }
-                            className="w-full rounded-xl bg-indigo-600 px-5 py-3.5 font-bold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                            {loading
-                                ? "Creating Account..."
-                                : "Create Account"}
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={handleBack}
-                            disabled={loading}
-                            className="w-full rounded-xl border border-slate-300 bg-white px-5 py-3 font-semibold text-slate-700 hover:bg-slate-50"
-                        >
-                            ← Back
-                        </button>
-
-                    </form>
-                )}
-
-                {/* ================= MESSAGE ================= */}
-
-                {message && (
-                    <div
-                        className={`mt-5 rounded-xl px-4 py-3 text-center text-sm font-medium ${
-                            message.toLowerCase().includes(
-                                "success"
-                            ) ||
-                            message
-                                .toLowerCase()
-                                .includes("sent") ||
-                            message
-                                .toLowerCase()
-                                .includes("verified") ||
-                            message
-                                .toLowerCase()
-                                .includes("created")
-                                ? "bg-emerald-50 text-emerald-700"
-                                : "bg-red-50 text-red-700"
-                        }`}
-                    >
-                        {message}
-                    </div>
-                )}
-
-                {/* ================= LOGIN ================= */}
-
-                <div className="mt-6 text-center">
-
-                    <p className="text-sm text-slate-500">
-                        Already have an account?
-                    </p>
-
-                    <button
-                        type="button"
-                        onClick={() => navigate("/")}
-                        className="mt-1 font-semibold text-indigo-600 hover:text-indigo-700"
-                    >
-                        Sign In
-                    </button>
-
-                </div>
-
+  };
+
+  const goBack = () => {
+    clearMessages();
+    setStep((prev) => Math.max(1, prev - 1));
+  };
+
+  // Progress indicator
+  const StepIndicator = () => (
+    <div className="mb-6 flex items-center">
+      {[
+        { number: 1, title: "Details" },
+        { number: 2, title: "Verify" },
+        { number: 3, title: "Password" },
+      ].map((item, index) => (
+        <div
+          key={item.number}
+          className="flex flex-1 items-center last:flex-none"
+        >
+          <div className="flex flex-col items-center">
+            <div
+              className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition-all duration-300 ${
+                step >= item.number
+                  ? "bg-blue-600 text-white"
+                  : "bg-slate-100 text-slate-400"
+              }`}
+            >
+              {step > item.number ? "✓" : item.number}
             </div>
 
+            <span
+              className={`mt-1.5 text-[11px] font-medium ${
+                step >= item.number
+                  ? "text-blue-700"
+                  : "text-slate-400"
+              }`}
+            >
+              {item.title}
+            </span>
+          </div>
+
+          {index !== 2 && (
+            <div className="mx-2 mb-5 h-px flex-1 bg-slate-200">
+              <div
+                className={`h-full bg-blue-600 transition-all duration-500 ${
+                  step > item.number ? "w-full" : "w-0"
+                }`}
+              />
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-white lg:grid lg:grid-cols-2">
+      <style>{`
+        @keyframes imageZoom {
+          from {
+            transform: scale(1.08);
+          }
+          to {
+            transform: scale(1);
+          }
+        }
+
+        @keyframes formEnter {
+          from {
+            opacity: 0;
+            transform: translateX(24px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+
+        @keyframes stepEnter {
+          from {
+            opacity: 0;
+            transform: translateY(12px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .campus-photo {
+          animation: imageZoom 6.5s ease both;
+        }
+
+        .form-enter {
+          animation: formEnter .65s cubic-bezier(.2,.8,.2,1) both;
+        }
+
+        .step-enter {
+          animation: stepEnter .4s ease both;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .campus-photo,
+          .form-enter,
+          .step-enter {
+            animation: none;
+          }
+        }
+      `}</style>
+
+      {/* LEFT: CAMPUS IMAGE */}
+      <section className="relative hidden h-screen overflow-hidden bg-slate-900 lg:block">
+        {campusImages.map((image, index) => (
+          <img
+            key={image}
+            src={image}
+            alt="Medi-Caps University Campus"
+            className={`campus-photo absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 ${
+              currentImage === index ? "opacity-100" : "opacity-0"
+            }`}
+          />
+        ))}
+
+        {/* Very subtle bottom gradient */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-black/10" />
+
+        {/* Small university logo */}
+        <div className="absolute left-8 top-8 z-10">
+          <div className="rounded-xl bg-white/95 p-3 shadow-lg">
+            <img
+              src={logoUrl}
+              alt="Medi-Caps University"
+              className="h-12 w-auto max-w-[190px] object-contain"
+            />
+          </div>
         </div>
 
-    </div>
-);
+        {/* Minimal branding only */}
+        <div className="absolute bottom-10 left-10 z-10">
+          <p className="text-3xl font-bold tracking-tight text-white drop-shadow-lg">
+            CampusFix
+          </p>
+          <p className="mt-1 text-sm text-white/90">
+            Medi-Caps University
+          </p>
+        </div>
 
+        {/* Slideshow indicators */}
+        <div className="absolute bottom-12 right-10 z-10 flex gap-2">
+          {campusImages.map((_, index) => (
+            <button
+              key={index}
+              type="button"
+              onClick={() => setCurrentImage(index)}
+              aria-label={`Show campus image ${index + 1}`}
+              className={`h-1.5 rounded-full transition-all duration-300 ${
+                currentImage === index
+                  ? "w-7 bg-white"
+                  : "w-1.5 bg-white/60"
+              }`}
+            />
+          ))}
+        </div>
+      </section>
+
+      {/* RIGHT: REGISTRATION */}
+      <section className="form-enter flex min-h-screen items-center justify-center bg-[#f8fafc] px-4 py-7 sm:px-8 lg:px-6 xl:px-12">
+        <div className="w-full max-w-[630px]">
+          {/* Mobile branding */}
+          <div className="mb-6 flex items-center justify-center gap-3 lg:hidden">
+            <img
+              src={logoUrl}
+              alt="Medi-Caps University"
+              className="h-10 w-auto max-w-[150px] object-contain"
+            />
+
+            <div className="h-8 w-px bg-slate-200" />
+
+            <span className="text-lg font-bold text-slate-800">
+              CampusFix
+            </span>
+          </div>
+
+          {/* Compact card */}
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_12px_45px_rgba(15,23,42,0.07)] sm:p-7">
+            {/* Heading */}
+            <div className="mb-5">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[1.5px] text-blue-600">
+                Student Portal
+              </p>
+
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-[28px]">
+                {step === 1 && "Create your account"}
+                {step === 2 && "Verify your email"}
+                {step === 3 && "Set your password"}
+              </h1>
+
+              <p className="mt-1.5 text-sm leading-5 text-slate-500">
+                {step === 1 &&
+                  "Enter your student details to get started."}
+                {step === 2 &&
+                  "Enter the OTP sent to your college email."}
+                {step === 3 &&
+                  "Create a secure password for your account."}
+              </p>
+            </div>
+
+            <StepIndicator />
+
+            {/* Error */}
+            {error && (
+              <div
+                role="alert"
+                className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700"
+              >
+                {error}
+              </div>
+            )}
+
+            {/* Success */}
+            {message && (
+              <div
+                role="status"
+                className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-700"
+              >
+                {message}
+              </div>
+            )}
+
+            {/* STEP 1 */}
+            {step === 1 && (
+              <form
+                key="details"
+                onSubmit={handleRegister}
+                className="step-enter space-y-3.5"
+              >
+                <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+                  <FormField
+                    label="Full Name"
+                    name="name"
+                    value={form.name}
+                    onChange={handleChange}
+                    placeholder="Your full name"
+                  />
+
+                  <FormField
+                    label="Enrollment Number"
+                    name="enrollmentNumber"
+                    value={form.enrollmentNumber}
+                    onChange={handleChange}
+                    placeholder="Enrollment number"
+                  />
+
+                  <div className="sm:col-span-2">
+                    <FormField
+                      label="College Email"
+                      name="email"
+                      type="email"
+                      value={form.email}
+                      onChange={handleChange}
+                      placeholder="name@medicaps.ac.in"
+                    />
+                  </div>
+
+                  <FormField
+                    label="Mobile Number"
+                    name="phoneNumber"
+                    type="tel"
+                    value={form.phoneNumber}
+                    onChange={handleChange}
+                    placeholder="10-digit mobile number"
+                  />
+
+                  <FormField
+                    label="Department"
+                    name="department"
+                    value={form.department}
+                    onChange={handleChange}
+                    placeholder="Department"
+                  />
+
+                  <FormField
+                    label="Branch"
+                    name="branch"
+                    value={form.branch}
+                    onChange={handleChange}
+                    placeholder="Your branch"
+                  />
+
+                  <div>
+                    <label htmlFor="semester" className={labelClass}>
+                      Semester <span className="text-red-500">*</span>
+                    </label>
+
+                    <select
+                      id="semester"
+                      name="semester"
+                      value={form.semester}
+                      onChange={handleChange}
+                      className={inputClass}
+                      required
+                    >
+                      <option value="">Select semester</option>
+                      {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => (
+                        <option key={sem} value={sem}>
+                          Semester {sem}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <FormField
+                    label="Class / Section"
+                    name="classSection"
+                    value={form.classSection}
+                    onChange={handleChange}
+                    placeholder="e.g. A"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-800 hover:shadow-lg hover:shadow-blue-700/20 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {loading ? "Sending OTP..." : "Continue"}
+                  {!loading && <span>→</span>}
+                </button>
+              </form>
+            )}
+
+            {/* STEP 2 */}
+            {step === 2 && (
+              <form
+                key="verification"
+                onSubmit={handleVerifyOTP}
+                className="step-enter"
+              >
+                <div className="mb-5 rounded-xl bg-blue-50 p-4">
+                  <p className="text-sm font-medium text-slate-700">
+                    Verification code sent to
+                  </p>
+
+                  <p className="mt-1 break-all text-sm font-semibold text-blue-700">
+                    {form.email}
+                  </p>
+                </div>
+
+                <label htmlFor="emailOTP" className={labelClass}>
+                  Enter 6-digit OTP
+                </label>
+
+                <input
+                  id="emailOTP"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  value={emailOTP}
+                  onChange={(e) =>
+                    setEmailOTP(e.target.value.replace(/\D/g, ""))
+                  }
+                  placeholder="000000"
+                  className={`${inputClass} text-center text-xl font-bold tracking-[10px]`}
+                  required
+                />
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="mt-6 w-full rounded-lg bg-blue-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:opacity-60"
+                >
+                  {loading ? "Verifying..." : "Verify Email →"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={goBack}
+                  className="mt-3 w-full rounded-lg border border-slate-200 px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+                >
+                  ← Back
+                </button>
+              </form>
+            )}
+
+            {/* STEP 3 */}
+            {step === 3 && (
+              <form
+                key="password"
+                onSubmit={handleCompleteRegistration}
+                className="step-enter"
+              >
+                <div className="mb-5 rounded-lg bg-emerald-50 px-3.5 py-3">
+                  <p className="text-sm font-semibold text-emerald-700">
+                    ✓ Email successfully verified
+                  </p>
+                  <p className="mt-1 break-all text-xs text-emerald-700">
+                    {form.email}
+                  </p>
+                </div>
+
+                <div className="mb-4">
+                  <label htmlFor="password" className={labelClass}>
+                    Create Password
+                  </label>
+
+                  <div className="relative">
+                    <input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Enter your password"
+                      className={`${inputClass} pr-16`}
+                      required
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-blue-600"
+                    >
+                      {showPassword ? "Hide" : "Show"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Password strength */}
+                <div className="mb-4 rounded-lg bg-slate-50 p-3.5">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-700">
+                      Password requirements
+                    </span>
+                    <span className="text-xs font-semibold text-blue-600">
+                      {passwordStrength}/5
+                    </span>
+                  </div>
+
+                  <div className="mb-3 flex gap-1">
+                    {passwordChecks.map((item, index) => (
+                      <div
+                        key={index}
+                        className={`h-1.5 flex-1 rounded-full ${
+                          item.valid ? "bg-emerald-500" : "bg-slate-200"
+                        }`}
+                      />
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-2">
+                    {passwordChecks.map((item, index) => (
+                      <p
+                        key={index}
+                        className={`text-xs ${
+                          item.valid ? "text-emerald-700" : "text-slate-500"
+                        }`}
+                      >
+                        {item.valid ? "✓" : "○"} {item.label}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="confirmPassword" className={labelClass}>
+                    Confirm Password
+                  </label>
+
+                  <div className="relative">
+                    <input
+                      id="confirmPassword"
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={confirmPassword}
+                      onChange={(e) =>
+                        setConfirmPassword(e.target.value)
+                      }
+                      placeholder="Confirm your password"
+                      className={`${inputClass} pr-16`}
+                      required
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShowConfirmPassword(!showConfirmPassword)
+                      }
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-blue-600"
+                    >
+                      {showConfirmPassword ? "Hide" : "Show"}
+                    </button>
+                  </div>
+                </div>
+
+                {confirmPassword && (
+                  <p
+                    className={`mt-2 text-xs ${
+                      password === confirmPassword
+                        ? "text-emerald-600"
+                        : "text-red-500"
+                    }`}
+                  >
+                    {password === confirmPassword
+                      ? "✓ Passwords match"
+                      : "Passwords do not match"}
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="mt-6 w-full rounded-lg bg-blue-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:opacity-60"
+                >
+                  {loading ? "Creating Account..." : "Create Account ✓"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={goBack}
+                  className="mt-3 w-full rounded-lg border border-slate-200 px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+                >
+                  ← Back
+                </button>
+              </form>
+            )}
+
+            {/* Login link */}
+            <div className="mt-5 border-t border-slate-100 pt-4 text-center">
+              <p className="text-sm text-slate-500">
+                Already have an account?{" "}
+                <button
+                  type="button"
+                  onClick={() => navigate("/")}
+                  className="font-semibold text-blue-700 hover:text-blue-900"
+                >
+                  Login
+                </button>
+              </p>
+            </div>
+          </div>
+
+          <p className="mt-5 text-center text-xs text-slate-400">
+            © {new Date().getFullYear()} CampusFix · Medi-Caps University
+          </p>
+        </div>
+      </section>
+    </div>
+  );
 }
 
 export default Register;

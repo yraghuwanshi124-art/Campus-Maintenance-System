@@ -213,7 +213,7 @@ function MyComplaints({ darkMode: darkModeProp }) {
       >
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-5">
-            <div
+            {/* <div
               className={`rounded-xl px-3 py-1.5 shadow-sm ${
                 isDark ? "border border-slate-700 bg-slate-800" : "bg-white"
               }`}
@@ -223,7 +223,7 @@ function MyComplaints({ darkMode: darkModeProp }) {
                 alt="Medi-Caps University"
                 className="h-11 w-auto object-contain"
               />
-            </div>
+            </div> */}
 
             <div
               className={`hidden border-l-2 pl-5 sm:block ${

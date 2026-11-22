@@ -4,7 +4,8 @@ const User = require("../models/User");
 
 const {
   sendComplaintNotification,
-  sendComplaintResolvedEmail,
+  // sendComplaintResolvedEmail,
+  sendFakeComplaintWarningEmail,
 } = require("../services/emailService");
 
 const {
@@ -267,6 +268,7 @@ const getAssignedComplaints = async (req, res) => {
   try {
     const complaints = await Complaint.find({
       technician: req.user.userId,
+      isFake: { $ne: true },
     })
       .populate("user", "name email classSection")
       .populate("admin", "name email assignedBlocks")
@@ -307,6 +309,7 @@ const getAllComplaints = async (req, res) => {
       block: {
         $in: admin.assignedBlocks || [],
       },
+      isFake: { $ne: true },
     })
       .populate(
         "user",
@@ -340,74 +343,70 @@ const getAllComplaints = async (req, res) => {
 // TECHNICIAN → RESOLVED → STUDENT NOTIFICATION
 // =====================================================
 
+
 const updateComplaintStatus = async (req, res) => {
   try {
     const { status } = req.body;
 
-    const allowedStatuses = [
-      "Pending",
-      "Assigned",
-      "In Progress",
-      "Resolved",
-    ];
+    // Technician cannot directly resolve a complaint.
+    const allowedStatuses = ["Assigned", "In Progress"];
 
     if (!allowedStatuses.includes(status)) {
       return res.status(400).json({
-        message: "Invalid status",
+        message:
+          "Technicians can only update status to Assigned or In Progress. Supervisor approval is required for resolution.",
       });
     }
 
-    const complaint = await Complaint.findOneAndUpdate(
-      {
-        _id: req.params.id,
-        technician: req.user.userId,
-      },
-      {
-        status,
-        ...(status === "Resolved" && {
-          resolvedAt: new Date(),
-        }),
-      },
-      {
-        new: true,
-      }
-    );
+    const complaint = await Complaint.findOne({
+      _id: req.params.id,
+      technician: req.user.userId,
+      isFake: false,
+    });
 
     if (!complaint) {
       return res.status(404).json({
-        message: "Complaint not found",
+        message: "Complaint not found or not assigned to you.",
       });
     }
 
-    // =================================================
-    // COMPLAINT RESOLVED
-    // =================================================
-
-    if (status === "Resolved") {
-      await sendComplaintResolvedEmail(complaint);
-
-      await createNotification({
-        recipient: complaint.user,
-        title: "Complaint Resolved",
-        message: `Your ${complaint.category} complaint for ${complaint.block}, Room ${complaint.room} has been resolved.`,
-        type: "complaint_resolved",
-        complaint: complaint._id,
+    if (complaint.verificationStatus === "Pending") {
+      return res.status(400).json({
+        message: "Your completion submission is awaiting supervisor verification.",
       });
     }
 
-    res.json({
-      message: "Complaint status updated",
+    if (complaint.verificationStatus === "Approved") {
+      return res.status(400).json({
+        message: "This complaint has already been approved.",
+      });
+    }
+
+    complaint.status = status;
+
+    complaint.auditHistory.push({
+      action: "STATUS_UPDATED",
+      details: `Technician changed complaint status to ${status}.`,
+      performedBy: req.user.userId,
+      performedAt: new Date(),
+    });
+
+    await complaint.save();
+
+    return res.json({
+      message: "Complaint status updated successfully.",
       complaint,
     });
   } catch (error) {
     console.error("UPDATE COMPLAINT STATUS ERROR:", error);
 
-    res.status(500).json({
-      message: "Failed to update complaint status",
+    return res.status(500).json({
+      message: "Failed to update complaint status.",
       error: error.message,
     });
   }
 };
+
 
 // =====================================================
 // ASSIGN COMPLAINT
@@ -595,51 +594,82 @@ const deleteComplaint = async (req, res) => {
 // UPLOAD COMPLETION PHOTO
 // =====================================================
 
+
 const uploadCompletionPhoto = async (req, res) => {
   try {
-    const { completionImage } = req.body;
+    const { completionImage, resolutionRemarks } = req.body;
 
-    if (!completionImage) {
+    if (!completionImage || !resolutionRemarks?.trim()) {
       return res.status(400).json({
-        message: "Completion photo is required",
+        message: "Completion photo and resolution remarks are required.",
       });
     }
 
-    const complaint = await Complaint.findOneAndUpdate(
-      {
-        _id: req.params.id,
-        technician: req.user.userId,
-      },
-      {
-        completionImage,
-      },
-      {
-        new: true,
-      }
-    );
+    const complaint = await Complaint.findOne({
+      _id: req.params.id,
+      technician: req.user.userId,
+      isFake: false,
+    });
 
     if (!complaint) {
       return res.status(404).json({
-        message:
-          "Complaint not found or not assigned to you",
+        message: "Complaint not found or not assigned to you.",
       });
     }
 
-    res.json({
-      message:
-        "Completion photo uploaded successfully",
+    if (complaint.status === "Resolved") {
+      return res.status(400).json({
+        message: "This complaint is already resolved.",
+      });
+    }
+
+    if (complaint.verificationStatus === "Pending") {
+      return res.status(400).json({
+        message: "Your previous submission is awaiting verification.",
+      });
+    }
+
+    complaint.completionImage = completionImage;
+    complaint.resolutionRemarks = resolutionRemarks.trim();
+    complaint.verificationStatus = "Pending";
+    complaint.verifiedBy = null;
+    complaint.verifiedAt = null;
+    complaint.verificationRemarks = "";
+
+    complaint.auditHistory.push({
+      action: "COMPLETION_SUBMITTED",
+      details: "Technician submitted completion photo and remarks for supervisor verification.",
+      performedBy: req.user.userId,
+      performedAt: new Date(),
+    });
+
+    await complaint.save();
+
+    // Notify supervisor.
+    if (complaint.supervisor) {
+      await createNotification({
+        recipient: complaint.supervisor,
+        title: "Complaint Awaiting Verification",
+        message: `Technician has submitted completion details for the ${complaint.category} complaint in ${complaint.block}, Room ${complaint.room}. Please verify the work.`,
+        type: "system",
+        complaint: complaint._id,
+      });
+    }
+
+    return res.json({
+      message: "Completion details submitted for supervisor verification.",
       complaint,
     });
   } catch (error) {
-    console.log("Completion photo error:", error);
+    console.error("COMPLETION SUBMISSION ERROR:", error);
 
-    res.status(500).json({
-      message:
-        "Failed to upload completion photo",
+    return res.status(500).json({
+      message: "Failed to submit completion details.",
       error: error.message,
     });
   }
 };
+
 
 // =====================================================
 // SUBMIT FEEDBACK
@@ -702,6 +732,146 @@ const submitFeedback = async (req, res) => {
   }
 };
 
+
+// =====================================================
+// MARK COMPLAINT AS FAKE
+// ADMIN → STUDENT WARNING
+// =====================================================
+
+const markComplaintAsFake = async (req, res) => {
+  try {
+    const admin = await User.findById(req.user.userId);
+
+    if (!admin || admin.role !== "admin") {
+      return res.status(403).json({
+        message: "Access denied. Admin only.",
+      });
+    }
+
+    const existingComplaint = await Complaint.findById(req.params.id);
+
+    if (!existingComplaint) {
+      return res.status(404).json({
+        message: "Complaint not found.",
+      });
+    }
+
+    const canManageBlock = (admin.assignedBlocks || []).some(
+      (block) =>
+        String(block).trim().toLowerCase() ===
+        String(existingComplaint.block).trim().toLowerCase()
+    );
+
+    if (!canManageBlock) {
+      return res.status(403).json({
+        message: "You are not authorized to manage this complaint.",
+      });
+    }
+
+    if (existingComplaint.isFake) {
+      return res.status(400).json({
+        message: "This complaint is already marked as fake.",
+      });
+    }
+
+    // Mark complaint as fake without deleting it
+    const complaint = await Complaint.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        isFake: { $ne: true },
+      },
+      {
+        $set: {
+          isFake: true,
+          fakeMarkedAt: new Date(),
+          fakeMarkedBy: admin._id,
+        },
+      },
+      { new: true }
+    ).populate("user", "name email enrollmentNumber department semester classSection phoneNumber");
+
+    if (!complaint) {
+      return res.status(400).json({
+        message: "This complaint has already been marked as fake.",
+      });
+    }
+
+    // Student in-app notification
+    // Student in-app notification
+    // Student notification and email warning
+    if (complaint.user) {
+      await createNotification({
+        recipient: complaint.user._id,
+        title: "Fake Complaint Warning",
+        message: `Aapki complaint (${complaint._id}) verification ke baad fake payi gayi hai. Kripya bina valid reason ke fake complaints submit na karein. Isse college staff ka samay aur resources waste hote hain. Aisi activity repeat hone par aapke khilaf college disciplinary rules ke according action liya ja sakta hai.`,
+        type: "fake_complaint_warning",
+        complaint: complaint._id,
+      });
+
+      if (complaint.user.email) {
+        await sendFakeComplaintWarningEmail(
+          complaint.user.email,
+          complaint.user.name
+        );
+      }
+    }
+
+    return res.json({
+      message: "Complaint marked as fake successfully.",
+      complaint,
+    });
+  } catch (error) {
+    console.error("MARK FAKE COMPLAINT ERROR:", error);
+
+    return res.status(500).json({
+      message: "Failed to mark complaint as fake.",
+      error: error.message,
+    });
+  }
+};
+
+
+// =====================================================
+// GET FAKE COMPLAINTS
+// ADMIN → VIEW FAKE COMPLAINTS
+// =====================================================
+
+const getFakeComplaints = async (req, res) => {
+  try {
+    const admin = await User.findById(req.user.userId);
+
+    if (!admin || admin.role !== "admin") {
+      return res.status(403).json({
+        message: "Access denied. Admin only.",
+      });
+    }
+
+    const complaints = await Complaint.find({
+      block: { $in: admin.assignedBlocks || [] },
+      isFake: true,
+    })
+      .populate(
+        "user",
+        "name email enrollmentNumber department semester classSection phoneNumber"
+      )
+      .populate("admin", "name email assignedBlocks")
+      .populate("fakeMarkedBy", "name email")
+      .sort({ fakeMarkedAt: -1 });
+
+    return res.json({
+      complaints,
+    });
+  } catch (error) {
+    console.error("GET FAKE COMPLAINTS ERROR:", error);
+
+    return res.status(500).json({
+      message: "Failed to fetch fake complaints.",
+      error: error.message,
+    });
+  }
+};
+
+
 // =====================================================
 // EXPORTS
 // =====================================================
@@ -717,4 +887,8 @@ module.exports = {
   deleteComplaint,
   uploadCompletionPhoto,
   submitFeedback,
+
+  // Fake Complaint Management
+  markComplaintAsFake,
+  getFakeComplaints,
 };
