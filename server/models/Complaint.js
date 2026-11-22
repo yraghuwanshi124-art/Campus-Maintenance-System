@@ -185,4 +185,4 @@ const complaintSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("Complaint", complaintSchema);
+module.exports = mongoose.models.Complaint || mongoose.model("Complaint", complaintSchema);

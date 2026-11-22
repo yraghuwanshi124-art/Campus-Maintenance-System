@@ -36,4 +36,4 @@ const technicianSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("Technician", technicianSchema);
+module.exports = mongoose.models.Technician || mongoose.model("Technician", technicianSchema);
