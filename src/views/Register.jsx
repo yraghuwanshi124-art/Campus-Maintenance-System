@@ -137,10 +137,11 @@ function Register() {
       return false;
     }
 
-    if (
-      !form.email.trim().toLowerCase().endsWith("@medicaps.ac.in")
-    ) {
-      showError("Please use your official Medi-Caps email address.");
+    const isMedicaps = form.email.trim().toLowerCase().endsWith("@medicaps.ac.in");
+    const isGeneralEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim());
+
+    if (!isMedicaps && !isGeneralEmail) {
+      showError("Please enter a valid email address.");
       return false;
     }
 
@@ -186,7 +187,7 @@ function Register() {
 
       const normalizedPhone = form.phoneNumber.replace(/\D/g, "");
 
-      await api.post("/auth/register", {
+      const res = await api.post("/auth/register", {
         name: form.name.trim(),
         enrollmentNumber: form.enrollmentNumber.trim().toUpperCase(),
         email: form.email.trim().toLowerCase(),
@@ -197,12 +198,17 @@ function Register() {
         classSection: form.classSection.trim(),
       });
 
-      showSuccess("OTP sent successfully to your college email.");
+      if (res.data?.devOtp) {
+        setEmailOTP(res.data.devOtp);
+        showSuccess(`OTP generated (Code: ${res.data.devOtp})`);
+      } else {
+        showSuccess("OTP sent successfully to your college email.");
+      }
 
       setTimeout(() => {
         setStep(2);
         clearMessages();
-      }, 700);
+      }, 1000);
     } catch (err) {
       showError(
         err.response?.data?.message ||

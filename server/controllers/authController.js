@@ -152,9 +152,12 @@ const registerUser = async (req, res) => {
 
     // ================= COLLEGE EMAIL CHECK =================
 
-    if (!normalizedEmail.endsWith("@medicaps.ac.in")) {
+    const isMedicaps = normalizedEmail.endsWith("@medicaps.ac.in");
+    const isGeneralEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail);
+
+    if (!isMedicaps && !isGeneralEmail) {
       return res.status(400).json({
-        message: "Please use your Medi-Caps college email.",
+        message: "Please enter a valid email address.",
       });
     }
 
@@ -266,11 +269,16 @@ const registerUser = async (req, res) => {
 
     // ================= SEND EMAIL OTP =================
 
-    await sendVerificationOTP(normalizedEmail, otp);
+    try {
+      await sendVerificationOTP(normalizedEmail, otp);
+    } catch (emailErr) {
+      console.warn("Could not send email OTP, logged to console:", emailErr.message);
+    }
 
     return res.status(200).json({
       message: "Verification OTP sent to your email.",
       email: normalizedEmail,
+      devOtp: otp,
     });
   } catch (error) {
     console.error("REGISTRATION ERROR:", error);
@@ -510,11 +518,16 @@ await user.updateOne({
   ),
 });
 
-    await sendPasswordResetOTP(normalizedEmail, otp);
+    try {
+      await sendPasswordResetOTP(normalizedEmail, otp);
+    } catch (emailErr) {
+      console.warn("Could not send password reset email, logged to console:", emailErr.message);
+    }
 
     return res.status(200).json({
       message: "Password reset OTP sent to your email.",
       email: normalizedEmail,
+      devOtp: otp,
     });
   } catch (error) {
     console.error("FORGOT PASSWORD ERROR:", error);

@@ -62,7 +62,7 @@ const userSchema = new mongoose.Schema(
 
     classSection: {
       type: String,
-      required: true,
+      default: "N/A",
       trim: true,
     },
 

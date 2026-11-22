@@ -20,8 +20,16 @@ async function connectToDatabase() {
 
     cached.promise = mongoose
       .connect(uri)
-      .then((mongooseInstance) => {
+      .then(async (mongooseInstance) => {
         console.log("MongoDB connected successfully");
+
+        // Seed default accounts if database is empty
+        try {
+          const seedDefaultUsers = require("../scripts/seedUsers");
+          await seedDefaultUsers();
+        } catch (seedErr) {
+          console.warn("User seeding skipped:", seedErr.message);
+        }
 
         // Start background scheduler in persistent dev mode (on Vercel, Vercel Cron is used)
         if (typeof window === "undefined" && !process.env.VERCEL && !global._schedulerStarted) {

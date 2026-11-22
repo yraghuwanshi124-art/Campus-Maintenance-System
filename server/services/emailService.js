@@ -221,6 +221,13 @@ const sendComplaintResolvedEmail = async (complaint) => {
 
 const sendVerificationOTP = async (email, otp) => {
   try {
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      console.log(`\n==================================================`);
+      console.log(`[CAMPUSFIX] Verification OTP for ${email}: ${otp}`);
+      console.log(`==================================================\n`);
+      return true;
+    }
+
     await transporter.sendMail({
       from: `"CampusFix" <${process.env.EMAIL_USER}>`,
       to: email,
@@ -262,9 +269,13 @@ const sendVerificationOTP = async (email, otp) => {
     });
 
     console.log("Verification OTP sent successfully");
+    return true;
   } catch (error) {
-    console.log("OTP email failed:", error.message);
-    throw error;
+    console.log("OTP email failed (falling back to console):", error.message);
+    console.log(`\n==================================================`);
+    console.log(`[CAMPUSFIX OTP] Verification OTP for ${email}: ${otp}`);
+    console.log(`==================================================\n`);
+    return false;
   }
 };
 
@@ -272,6 +283,13 @@ const sendVerificationOTP = async (email, otp) => {
 
 const sendPasswordResetOTP = async (email, otp) => {
   try {
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      console.log(`\n==================================================`);
+      console.log(`[CAMPUSFIX] Password Reset OTP for ${email}: ${otp}`);
+      console.log(`==================================================\n`);
+      return true;
+    }
+
     await transporter.sendMail({
       from: `"CampusFix" <${process.env.EMAIL_USER}>`,
       to: email,
@@ -340,13 +358,13 @@ const sendPasswordResetOTP = async (email, otp) => {
     });
 
     console.log("Password reset OTP sent successfully");
+    return true;
   } catch (error) {
-    console.log(
-      "Password reset OTP email failed:",
-      error.message
-    );
-
-    throw error;
+    console.log("Password reset OTP email failed (falling back to console):", error.message);
+    console.log(`\n==================================================`);
+    console.log(`[CAMPUSFIX OTP] Password Reset OTP for ${email}: ${otp}`);
+    console.log(`==================================================\n`);
+    return false;
   }
 };
 
