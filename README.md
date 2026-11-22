@@ -1,6 +1,6 @@
 # 🏫 CampusFix – Full-Stack Next.js Edition
 
-CampusFix has been shifted to a unified **Next.js Full-Stack Monolithic Architecture** using Next.js App Router for the frontend and API Route Handlers for the backend.
+CampusFix is a web-based campus maintenance management system built as a unified **Next.js Full-Stack Application** using Next.js App Router for the frontend and API Route Handlers for the backend.
 
 ## 🚀 Running Locally
 
@@ -11,7 +11,6 @@ CampusFix has been shifted to a unified **Next.js Full-Stack Monolithic Architec
 
 2. **Start the Next.js development server:**
    ```bash
-   cd next-app
    npm install
    npm run dev
    ```
@@ -19,6 +18,16 @@ CampusFix has been shifted to a unified **Next.js Full-Stack Monolithic Architec
 3. **Open the application:**
    - **App:** [http://localhost:3000](http://localhost:3000)
    - **API Health Check:** [http://localhost:3000/api/health](http://localhost:3000/api/health)
+
+## ☁️ Deploying to Vercel
+
+1. Import this repository in [Vercel](https://vercel.com).
+2. Set Environment Variables:
+   - `MONGODB_URI`: MongoDB Atlas connection string
+   - `JWT_SECRET`: Secret key for JWT authentication
+   - `GEMINI_API_KEY`: (Optional) For AI Chatbot
+   - `EMAIL_USER` & `EMAIL_PASS`: (Optional) For email notifications
+3. Deploy!
 
 ## 📁 Architecture
 
