@@ -8,8 +8,9 @@ const {
   getSupervisorComplaints,
   getTechniciansForSupervisor,
   assignTechnician,
-    setComplaintDeadline,
   verifyComplaint,
+  setComplaintDeadline,
+  deleteComplaint,
 } = require("../controllers/supervisorController");
 
 const protect = require("../middleware/authMiddleware");
@@ -44,6 +45,13 @@ router.put(
   allowRoles("admin"),
   updateSupervisor
 );
+// Admin updates complaint deadline
+router.patch(
+  "/complaints/:id/deadline",
+  protect,
+  allowRoles("admin"),
+  setComplaintDeadline
+);
 
 // =====================================================
 // SUPERVISOR
@@ -73,12 +81,14 @@ router.patch(
   assignTechnician
 );
 
-router.patch(
-  "/complaints/:id/deadline",
+// Delete only resolved complaints assigned to logged-in supervisor
+router.delete(
+  "/complaints/:id",
   protect,
   allowRoles("supervisor"),
-  setComplaintDeadline
+  deleteComplaint
 );
+
 
 router.patch(
   "/complaints/:id/verify",

@@ -462,24 +462,18 @@ const updateSupervisor = async (req, res) => {
 
 const getSupervisorComplaints = async (req, res) => {
   try {
-    const supervisor = await User.findById(
-      req.user.userId
-    ).select("role assignedBlocks");
+const supervisor = await User.findById(req.user.userId);
 
-    if (
-      !supervisor ||
-      supervisor.role !== "supervisor"
-    ) {
-      return res.status(403).json({
-        message:
-          "Access denied. Supervisor only.",
-      });
-    }
+if (!supervisor || supervisor.role !== "supervisor") {
+  return res.status(403).json({
+    message: "Access denied. Supervisor only.",
+  });
+}
 
-    const complaints = await Complaint.find({
-      supervisor: supervisor._id,
-      isFake: { $ne: true },
-    })
+const complaints = await Complaint.find({
+  supervisor: supervisor._id,
+  isFake: { $ne: true },
+})
       .select(
         [
           "block",
@@ -609,6 +603,7 @@ const getTechniciansForSupervisor = async (req, res) => {
 // ASSIGN / REASSIGN TECHNICIAN - SUPERVISOR ONLY
 // ======================================================
 
+
 const assignTechnician = async (req, res) => {
   try {
     const { technicianId, reason } = req.body;
@@ -632,6 +627,13 @@ const assignTechnician = async (req, res) => {
     if (!complaint) {
       return res.status(404).json({
         message: "Complaint not found.",
+      });
+    }
+
+    // Admin must assign a deadline before technician assignment.
+    if (!complaint.deadline) {
+      return res.status(400).json({
+        message: "This complaint does not have an admin-assigned deadline.",
       });
     }
 
@@ -725,37 +727,10 @@ const assignTechnician = async (req, res) => {
       assignedAt: new Date(),
     });
 
-    // Set a fresh suggested deadline for the new assignment.
-    const hours = getSuggestedDeadlineHours(
-      complaint.category,
-      complaint.priority
-    );
-
-    const newDeadline = new Date(
-      Date.now() + hours * 60 * 60 * 1000
-    );
-
-    complaint.deadlineHistory.push({
-      previousDeadline: complaint.deadline || null,
-      newDeadline,
-      reason: previousTechnician
-        ? `Fresh deadline after technician reassignment: ${reason.trim()}`
-        : `Initial deadline on technician assignment: ${reason.trim()}`,
-      changedBy: supervisor._id,
-      changedAt: new Date(),
-    });
-
+    // Assign technician without changing Admin's deadline.
     complaint.technician = technician._id;
     complaint.technicianAssignedAt = new Date();
     complaint.status = "Assigned";
-
-    complaint.deadline = newDeadline;
-    complaint.deadlineSetBy = supervisor._id;
-    complaint.deadlineReason =
-      `Suggested ${hours}-hour SLA after assignment. Reason: ${reason.trim()}`;
-
-    complaint.deadlineVersion =
-      (complaint.deadlineVersion || 0) + 1;
 
     // Reset verification for the new technician's work.
     complaint.verificationStatus = "Not Submitted";
@@ -766,11 +741,12 @@ const assignTechnician = async (req, res) => {
     complaint.completionImage = "";
     complaint.resolvedAt = null;
 
+    // Audit history.
     complaint.auditHistory.push({
       action: previousTechnician
         ? "TECHNICIAN_REASSIGNED"
         : "TECHNICIAN_ASSIGNED",
-      details: `Technician ${technician.name} assigned. Reason: ${reason.trim()}. Fresh deadline: ${newDeadline.toISOString()}`,
+      details: `Technician ${technician.name} assigned. Reason: ${reason.trim()}. Existing admin deadline: ${complaint.deadline.toISOString()}`,
       performedBy: supervisor._id,
       performedAt: new Date(),
     });
@@ -783,7 +759,7 @@ const assignTechnician = async (req, res) => {
       title: previousTechnician
         ? "Complaint Reassigned to You"
         : "New Complaint Assigned",
-      message: `A ${complaint.category} complaint in ${complaint.block}, Room ${complaint.room} has been assigned to you. Your resolution deadline is ${newDeadline.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}.`,
+      message: `A ${complaint.category} complaint in ${complaint.block}, Room ${complaint.room} has been assigned to you. Original resolution deadline: ${complaint.deadline.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}.`,
       type: "technician_assigned",
       complaint: complaint._id,
     });
@@ -854,24 +830,172 @@ const assignTechnician = async (req, res) => {
 };
 
 
+
 // ======================================================
 // SET / UPDATE COMPLAINT DEADLINE - SUPERVISOR ONLY
 // ======================================================
 
 const setComplaintDeadline = async (req, res) => {
   try {
-    const { deadline, useSuggestedDeadline, reason } = req.body;
+    const { deadlineHours, reason } = req.body;
 
-    const supervisor = await User.findById(
-      req.user.userId
-    ).select("role assignedBlocks");
+    // Validate deadline hours
+    const hours = Number(deadlineHours);
 
-    if (!supervisor || supervisor.role !== "supervisor") {
-      return res.status(403).json({
-        message: "Access denied. Supervisor only.",
+    if (!Number.isFinite(hours) || hours <= 0) {
+      return res.status(400).json({
+        message: "Please select a valid deadline in hours.",
       });
     }
 
+    // Verify Admin
+    const admin = await User.findById(req.user.userId);
+
+    if (!admin || admin.role !== "admin") {
+      return res.status(403).json({
+        message: "Access denied. Admin only.",
+      });
+    }
+
+    const complaint = await Complaint.findById(req.params.id);
+
+    if (!complaint) {
+      return res.status(404).json({
+        message: "Complaint not found.",
+      });
+    }
+
+    // Only existing Admin deadlines can be edited
+    if (!complaint.deadline) {
+      return res.status(400).json({
+        message: "This complaint does not have an admin-assigned deadline.",
+      });
+    }
+
+    // Verify Admin block ownership
+    const normalizeBlock = (block) =>
+      String(block || "").trim().toLowerCase();
+
+    const canManageBlock = (admin.assignedBlocks || []).some(
+      (block) =>
+        normalizeBlock(block) === normalizeBlock(complaint.block)
+    );
+
+    if (!canManageBlock) {
+      return res.status(403).json({
+        message: "You are not authorized to manage complaints for this block.",
+      });
+    }
+
+    // Resolved or fake complaints cannot be updated
+    if (complaint.status === "Resolved" || complaint.isFake) {
+      return res.status(400).json({
+        message: "Deadline cannot be changed for this complaint.",
+      });
+    }
+
+    const changedAt = new Date();
+    const previousDeadline = complaint.deadline;
+
+    const newDeadline = new Date(
+      changedAt.getTime() + hours * 60 * 60 * 1000
+    );
+
+    const deadlineReason =
+      reason?.trim() ||
+      `Admin updated the resolution deadline to ${hours} hours.`;
+
+    // Save deadline history
+    complaint.deadlineHistory.push({
+      previousDeadline,
+      newDeadline,
+      reason: deadlineReason,
+      changedBy: admin._id,
+      changedAt,
+    });
+
+    // Update deadline
+    complaint.deadline = newDeadline;
+    complaint.deadlineSetBy = admin._id;
+    complaint.deadlineReason = deadlineReason;
+    complaint.deadlineVersion =
+      (complaint.deadlineVersion || 0) + 1;
+
+    // Audit history
+    complaint.auditHistory.push({
+      action: "DEADLINE_UPDATED",
+      details: `Admin updated deadline to ${hours} hours. New deadline: ${newDeadline.toISOString()}. Reason: ${deadlineReason}`,
+      performedBy: admin._id,
+      performedAt: changedAt,
+    });
+
+    await complaint.save();
+
+    // Notify assigned technician
+    if (complaint.technician) {
+      await createNotification({
+        recipient: complaint.technician,
+        title: "Complaint Deadline Updated",
+        message: `The resolution deadline for your ${complaint.category} complaint in ${complaint.block}, Room ${complaint.room} has been updated to ${newDeadline.toLocaleString("en-IN", {
+          timeZone: "Asia/Kolkata",
+        })}.`,
+        type: "deadline_reminder",
+        complaint: complaint._id,
+      });
+    }
+
+    return res.json({
+      message: "Complaint deadline updated successfully.",
+      complaint: {
+        _id: complaint._id,
+        deadline: complaint.deadline,
+        deadlineSetBy: complaint.deadlineSetBy,
+        deadlineReason: complaint.deadlineReason,
+        deadlineVersion: complaint.deadlineVersion,
+        deadlineHistory: complaint.deadlineHistory,
+      },
+    });
+
+  } catch (error) {
+    console.error("SET COMPLAINT DEADLINE ERROR:", error);
+
+    return res.status(500).json({
+      message: "Failed to update complaint deadline.",
+      error: error.message,
+    });
+  }
+};
+
+
+
+const verifyComplaint = async (req, res) => {
+  try {
+    const { decision, remarks } = req.body;
+
+    // Validate decision.
+    if (!["Approved", "Rejected"].includes(decision)) {
+      return res.status(400).json({
+        message: "Decision must be Approved or Rejected.",
+      });
+    }
+
+    // Rejection reason is mandatory.
+    if (decision === "Rejected" && !remarks?.trim()) {
+      return res.status(400).json({
+        message: "Rejection reason is required.",
+      });
+    }
+
+    // Verify supervisor.
+    const supervisor = await User.findById(req.user.userId);
+
+    if (!supervisor || supervisor.role !== "supervisor") {
+      return res.status(403).json({
+        message: "Supervisor access required.",
+      });
+    }
+
+    // Find complaint.
     const complaint = await Complaint.findById(req.params.id);
 
     if (!complaint) {
@@ -886,169 +1010,11 @@ const setComplaintDeadline = async (req, res) => {
       complaint.supervisor.toString() !== supervisor._id.toString()
     ) {
       return res.status(403).json({
-        message: "You are not authorized to manage this complaint.",
-      });
-    }
-
-    // Verify block ownership.
-    const ownsBlock = (supervisor.assignedBlocks || []).some(
-      (block) =>
-        normalizeBlock(block) === normalizeBlock(complaint.block)
-    );
-
-    if (!ownsBlock) {
-      return res.status(403).json({
-        message: "This complaint does not belong to your assigned block.",
-      });
-    }
-
-    if (complaint.status === "Resolved" || complaint.isFake) {
-      return res.status(400).json({
-        message: "Deadline cannot be set for this complaint.",
-      });
-    }
-
-    let newDeadline;
-    let deadlineReason;
-
-    if (useSuggestedDeadline === true) {
-      const hours = getSuggestedDeadlineHours(
-        complaint.category,
-        complaint.priority
-      );
-
-      newDeadline = new Date(Date.now() + hours * 60 * 60 * 1000);
-
-      deadlineReason = `Suggested SLA: ${hours} hours for ${complaint.category} - ${complaint.priority} priority.`;
-    } else {
-      if (!deadline || !reason || !reason.trim()) {
-        return res.status(400).json({
-          message:
-            "A custom deadline and a reason are required when overriding the suggested deadline.",
-        });
-      }
-
-      newDeadline = new Date(deadline);
-
-      if (Number.isNaN(newDeadline.getTime())) {
-        return res.status(400).json({
-          message: "Please provide a valid deadline.",
-        });
-      }
-
-      if (newDeadline <= new Date()) {
-        return res.status(400).json({
-          message: "Deadline must be in the future.",
-        });
-      }
-
-      deadlineReason = reason.trim();
-    }
-
-    const previousDeadline = complaint.deadline || null;
-
-    complaint.deadlineHistory.push({
-      previousDeadline,
-      newDeadline,
-      reason: deadlineReason,
-      changedBy: supervisor._id,
-      changedAt: new Date(),
-    });
-
-    complaint.deadline = newDeadline;
-    complaint.deadlineSetBy = supervisor._id;
-    complaint.deadlineReason = deadlineReason;
-    complaint.deadlineVersion =
-      (complaint.deadlineVersion || 0) + 1;
-
-    complaint.auditHistory.push({
-      action: previousDeadline
-        ? "DEADLINE_UPDATED"
-        : "DEADLINE_SET",
-      details: `Deadline set to ${newDeadline.toISOString()}. Reason: ${deadlineReason}`,
-      performedBy: supervisor._id,
-      performedAt: new Date(),
-    });
-
-    await complaint.save();
-
-    // Notify assigned technician when available.
-    if (complaint.technician) {
-      await createNotification({
-        recipient: complaint.technician,
-        title: previousDeadline
-          ? "Complaint Deadline Updated"
-          : "Complaint Deadline Assigned",
-        message: `The resolution deadline for your ${complaint.category} complaint in ${complaint.block}, Room ${complaint.room} has been set to ${newDeadline.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}.`,
-        type: "deadline_reminder",
-        complaint: complaint._id,
-      });
-    }
-
-    return res.json({
-      message: previousDeadline
-        ? "Complaint deadline updated successfully."
-        : "Complaint deadline set successfully.",
-      complaint: {
-        _id: complaint._id,
-        deadline: complaint.deadline,
-        deadlineReason: complaint.deadlineReason,
-        deadlineVersion: complaint.deadlineVersion,
-        deadlineHistory: complaint.deadlineHistory,
-      },
-    });
-  } catch (error) {
-    console.error("SET COMPLAINT DEADLINE ERROR:", error);
-
-    return res.status(500).json({
-      message: "Failed to set complaint deadline.",
-      error: error.message,
-    });
-  }
-};
-
-
-const verifyComplaint = async (req, res) => {
-  try {
-    const { decision, remarks } = req.body;
-
-    if (!["Approved", "Rejected"].includes(decision)) {
-      return res.status(400).json({
-        message: "Decision must be Approved or Rejected.",
-      });
-    }
-
-    if (decision === "Rejected" && !remarks?.trim()) {
-      return res.status(400).json({
-        message: "Rejection reason is required.",
-      });
-    }
-
-    const supervisor = await User.findById(req.user.userId);
-
-    if (!supervisor || supervisor.role !== "supervisor") {
-      return res.status(403).json({
-        message: "Supervisor access required.",
-      });
-    }
-
-    const complaint = await Complaint.findById(req.params.id);
-
-    if (!complaint) {
-      return res.status(404).json({
-        message: "Complaint not found.",
-      });
-    }
-
-    if (
-      !complaint.supervisor ||
-      complaint.supervisor.toString() !== supervisor._id.toString()
-    ) {
-      return res.status(403).json({
         message: "You are not authorized to verify this complaint.",
       });
     }
 
+    // Verify assigned block.
     const ownsBlock = (supervisor.assignedBlocks || []).some(
       (block) =>
         normalizeBlock(block) === normalizeBlock(complaint.block)
@@ -1060,31 +1026,60 @@ const verifyComplaint = async (req, res) => {
       });
     }
 
+    // Prevent fake or already resolved complaints.
     if (complaint.isFake || complaint.status === "Resolved") {
       return res.status(400).json({
         message: "This complaint cannot be verified.",
       });
     }
 
+    // Only pending submissions can be verified.
     if (
       complaint.verificationStatus !== "Pending" ||
       !complaint.completionImage ||
       !complaint.resolutionRemarks?.trim()
     ) {
       return res.status(400).json({
-        message: "No complete technician submission is awaiting verification.",
+        message:
+          "No complete technician submission is awaiting verification.",
       });
     }
 
+    // Save verification details.
     complaint.verificationStatus = decision;
     complaint.verifiedBy = supervisor._id;
     complaint.verifiedAt = new Date();
     complaint.verificationRemarks = remarks?.trim() || "";
 
     if (decision === "Approved") {
+      // Final approval.
       complaint.status = "Resolved";
       complaint.resolvedAt = new Date();
 
+      complaint.auditHistory.push({
+        action: "COMPLAINT_VERIFIED",
+        details: remarks?.trim() || "Completion approved by supervisor.",
+        performedBy: supervisor._id,
+        performedAt: new Date(),
+      });
+
+    } else {
+      // Return complaint to technician for corrections.
+      complaint.status = "In Progress";
+      complaint.resolvedAt = null;
+
+      complaint.auditHistory.push({
+        action: "COMPLETION_REJECTED",
+        details: `Completion rejected. Reason: ${remarks.trim()}`,
+        performedBy: supervisor._id,
+        performedAt: new Date(),
+      });
+    }
+
+    await complaint.save();
+
+    // Send notifications after saving.
+    if (decision === "Approved") {
       await sendComplaintResolvedEmail(complaint);
 
       await createNotification({
@@ -1104,10 +1099,8 @@ const verifyComplaint = async (req, res) => {
           complaint: complaint._id,
         });
       }
-    } else {
-      complaint.status = "In Progress";
-      complaint.resolvedAt = null;
 
+    } else {
       if (complaint.technician) {
         await createNotification({
           recipient: complaint.technician,
@@ -1119,28 +1112,116 @@ const verifyComplaint = async (req, res) => {
       }
     }
 
-    complaint.auditHistory.push({
-      action: decision === "Approved"
-        ? "COMPLAINT_VERIFIED"
-        : "COMPLETION_REJECTED",
-      details: remarks?.trim() || "Completion approved by supervisor.",
-      performedBy: supervisor._id,
-      performedAt: new Date(),
-    });
-
-    await complaint.save();
-
-    return res.json({
-      message: decision === "Approved"
-        ? "Complaint verified and resolved successfully."
-        : "Completion rejected. Complaint returned to technician.",
+    return res.status(200).json({
+      message:
+        decision === "Approved"
+          ? "Complaint verified and resolved successfully."
+          : "Completion rejected. Complaint returned to technician.",
       complaint,
     });
+
   } catch (error) {
     console.error("VERIFY COMPLAINT ERROR:", error);
 
     return res.status(500).json({
       message: "Failed to verify complaint.",
+      error: error.message,
+    });
+  }
+};
+
+
+
+// ======================================================
+// DELETE RESOLVED COMPLAINT - SUPERVISOR ONLY
+// ======================================================
+
+const deleteComplaint = async (req, res) => {
+  try {
+    // Verify logged-in supervisor
+    const supervisor = await User.findById(req.user.userId);
+
+    if (!supervisor || supervisor.role !== "supervisor") {
+      return res.status(403).json({
+        message: "Access denied. Supervisor only.",
+      });
+    }
+
+    // Find complaint
+    const complaint = await Complaint.findById(req.params.id);
+
+    if (!complaint) {
+      return res.status(404).json({
+        message: "Complaint not found.",
+      });
+    }
+
+    // Verify complaint ownership
+    if (
+      !complaint.supervisor ||
+      complaint.supervisor.toString() !== supervisor._id.toString()
+    ) {
+      return res.status(403).json({
+        message: "You are not authorized to delete this complaint.",
+      });
+    }
+
+    // Verify assigned block
+    const ownsBlock = (supervisor.assignedBlocks || []).some(
+      (block) =>
+        normalizeBlock(block) === normalizeBlock(complaint.block)
+    );
+
+    if (!ownsBlock) {
+      return res.status(403).json({
+        message: "Complaint does not belong to your assigned block.",
+      });
+    }
+
+    // Only resolved complaints can be deleted
+    if (complaint.status !== "Resolved") {
+      return res.status(400).json({
+        message: "Only resolved complaints can be deleted.",
+      });
+    }
+
+    // Fake complaints cannot be deleted through this action
+    if (complaint.isFake) {
+      return res.status(400).json({
+        message: "Fake complaints cannot be deleted.",
+      });
+    }
+
+    // Atomically delete only if ownership and status still match
+    const deletedComplaint = await Complaint.findOneAndDelete({
+      _id: complaint._id,
+      supervisor: supervisor._id,
+      status: "Resolved",
+      isFake: { $ne: true },
+    });
+
+    if (!deletedComplaint) {
+      return res.status(409).json({
+        message: "Complaint could not be deleted. Please refresh and try again.",
+      });
+    }
+
+    return res.status(200).json({
+      message: "Resolved complaint deleted successfully.",
+      deletedComplaintId: deletedComplaint._id,
+    });
+
+  } catch (error) {
+    console.error("DELETE COMPLAINT ERROR:", error);
+
+    if (error.name === "CastError") {
+      return res.status(400).json({
+        message: "Invalid complaint ID.",
+      });
+    }
+
+    return res.status(500).json({
+      message: "Failed to delete complaint.",
       error: error.message,
     });
   }
@@ -1160,4 +1241,5 @@ module.exports = {
   assignTechnician,
   setComplaintDeadline,
   verifyComplaint,
+  deleteComplaint,
 };

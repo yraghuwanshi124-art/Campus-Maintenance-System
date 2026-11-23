@@ -14,100 +14,41 @@ function TechnicianDashboard() {
 
   const [complaints, setComplaints] = useState([]);
   const [showLogout, setShowLogout] = useState(false);
-
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [priorityFilter, setPriorityFilter] = useState("All");
-
   const [expandedComplaints, setExpandedComplaints] = useState({});
   const [showAllComplaints, setShowAllComplaints] = useState(false);
 
   const [uploadingId, setUploadingId] = useState(null);
+  const [startingId, setStartingId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+
   const [resolutionRemarks, setResolutionRemarks] = useState({});
   const [selectedFiles, setSelectedFiles] = useState({});
+  const [currentTime, setCurrentTime] = useState(Date.now());
 
-  // DEADLINE HELPERS
-  const getDeadlineState = (complaint) => {
-    if (!complaint?.deadline) return "Not Set";
-    if (complaint.status === "Resolved") return "Completed";
-    const difference = new Date(complaint.deadline).getTime() - Date.now();
-    if (difference <= 0) return "Overdue";
-    if (difference <= 2 * 60 * 60 * 1000) return "Urgent";
-    return "On Track";
-  };
-
-  const getRemainingTime = (deadline, status) => {
-    if (!deadline) return "No deadline set";
-    if (status === "Resolved") return "Work completed";
-    const difference = new Date(deadline).getTime() - Date.now();
-    if (difference <= 0) {
-      const minutesOver = Math.abs(Math.floor(difference / 60000));
-      const hoursOver = Math.floor(minutesOver / 60);
-      return hoursOver > 0
-        ? `Overdue by ${hoursOver}h ${minutesOver % 60}m`
-        : `Overdue by ${minutesOver}m`;
-    }
-    const hours = Math.floor(difference / 3600000);
-    const minutes = Math.floor((difference % 3600000) / 60000);
-    if (hours > 24) {
-      const days = Math.floor(hours / 24);
-      return `${days}d ${hours % 24}h remaining`;
-    }
-    return hours > 0
-      ? `${hours}h ${minutes}m remaining`
-      : `${minutes}m remaining`;
-  };
-
-  const getDeadlineBadgeStyle = (state) => {
-    if (state === "Completed") {
-      return darkMode
-        ? "border-emerald-800 bg-emerald-950/80 text-emerald-300"
-        : "border-emerald-200 bg-emerald-50 text-emerald-700";
-    }
-    if (state === "Overdue") {
-      return darkMode
-        ? "border-red-800 bg-red-950/80 text-red-300 animate-pulse"
-        : "border-red-200 bg-red-50 text-red-700 animate-pulse";
-    }
-    if (state === "Urgent") {
-      return darkMode
-        ? "border-amber-800 bg-amber-950/80 text-amber-300"
-        : "border-amber-200 bg-amber-50 text-amber-700";
-    }
-    if (state === "On Track") {
-      return darkMode
-        ? "border-blue-800 bg-blue-950/80 text-blue-300"
-        : "border-blue-200 bg-blue-50 text-blue-700";
-    }
-    return darkMode
-      ? "border-slate-700 bg-slate-800 text-slate-400"
-      : "border-slate-200 bg-slate-100 text-slate-500";
-  };
-
-  // THEME STYLES
+  // THEME
   const pageBg = darkMode ? "bg-slate-950" : "bg-slate-50";
-
-  const headerBg = darkMode
-    ? "border-slate-800 bg-slate-900/90"
-    : "border-slate-200 bg-white/90";
-
   const panel = darkMode
     ? "border-slate-800 bg-slate-900"
     : "border-slate-200 bg-white";
-
   const card = darkMode
     ? "border-slate-700 bg-slate-800"
     : "border-slate-200 bg-white";
-
   const softBg = darkMode ? "bg-slate-800" : "bg-slate-50";
-  const heading = darkMode ? "text-slate-100" : "text-slate-800";
+  const heading = darkMode ? "text-slate-100" : "text-slate-900";
   const bodyText = darkMode ? "text-slate-300" : "text-slate-600";
   const mutedText = darkMode ? "text-slate-400" : "text-slate-500";
-  const borderLine = darkMode ? "border-slate-700" : "border-slate-100";
+  const borderLine = darkMode ? "border-slate-700" : "border-slate-200";
+  const inputStyle = darkMode
+    ? "border-slate-700 bg-slate-950 text-white placeholder:text-slate-500"
+    : "border-slate-200 bg-white text-slate-800 placeholder:text-slate-400";
 
-  // FETCH ASSIGNED COMPLAINTS
+  // FETCH COMPLAINTS
   const fetchComplaints = async (isRefresh = false) => {
     try {
       if (isRefresh) {
@@ -115,6 +56,8 @@ function TechnicianDashboard() {
       } else {
         setLoading(true);
       }
+
+      setErrorMessage("");
 
       const token = localStorage.getItem("token");
 
@@ -126,9 +69,10 @@ function TechnicianDashboard() {
 
       setComplaints(response.data.complaints || []);
     } catch (error) {
-      console.error(
-        "TECHNICIAN DASHBOARD ERROR:",
-        error.response?.data || error
+      console.error("TECHNICIAN DASHBOARD ERROR:", error);
+      setErrorMessage(
+        error.response?.data?.message ||
+        "Unable to load assigned complaints. Please refresh."
       );
     } finally {
       setLoading(false);
@@ -140,17 +84,26 @@ function TechnicianDashboard() {
     fetchComplaints();
   }, []);
 
+  // Refresh deadline countdown every minute.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 60000);
+
+    return () => clearInterval(timer);
+  }, []);
+
   // DATE FORMAT
   const formatDateTime = (date) => {
     if (!date) return "Not available";
 
-    const parsedDate = new Date(date);
+    const parsed = new Date(date);
 
-    if (Number.isNaN(parsedDate.getTime())) {
+    if (Number.isNaN(parsed.getTime())) {
       return "Not available";
     }
 
-    return parsedDate.toLocaleString("en-IN", {
+    return parsed.toLocaleString("en-IN", {
       day: "2-digit",
       month: "short",
       year: "numeric",
@@ -159,74 +112,152 @@ function TechnicianDashboard() {
     });
   };
 
-  // STATUS STYLE
-  const getStatusStyle = (status) => {
-    const styles = {
-      Resolved: darkMode
-        ? "border-emerald-800 bg-emerald-950 text-emerald-300"
-        : "border-emerald-200 bg-emerald-50 text-emerald-700",
+  // DEADLINE HELPERS
+  const getDeadlineState = (complaint) => {
+    if (!complaint.deadline) return "Not Set";
+    if (complaint.status === "Resolved") return "Completed";
 
-      "In Progress": darkMode
-        ? "border-violet-800 bg-violet-950 text-violet-300"
-        : "border-violet-200 bg-violet-50 text-violet-700",
+    const difference =
+      new Date(complaint.deadline).getTime() - currentTime;
 
-      Assigned: darkMode
-        ? "border-amber-800 bg-amber-950 text-amber-300"
-        : "border-amber-200 bg-amber-50 text-amber-700",
-    };
+    if (Number.isNaN(difference)) return "Not Set";
+    if (difference <= 0) return "Overdue";
+    if (difference <= 2 * 60 * 60 * 1000) return "Urgent";
 
-    return (
-      styles[status] ||
-      (darkMode
-        ? "border-slate-600 bg-slate-700 text-slate-300"
-        : "border-slate-200 bg-slate-50 text-slate-600")
-    );
+    return "On Track";
   };
 
-  // PRIORITY STYLE
-  const getPriorityStyle = (priority) => {
+  const getRemainingTime = (complaint) => {
+    if (!complaint.deadline) return "No deadline assigned";
+    if (complaint.status === "Resolved") return "Work completed";
+
+    const difference =
+      new Date(complaint.deadline).getTime() - currentTime;
+
+    if (Number.isNaN(difference)) return "Deadline unavailable";
+
+    if (difference <= 0) {
+      const totalMinutes = Math.abs(Math.floor(difference / 60000));
+      const days = Math.floor(totalMinutes / 1440);
+      const hours = Math.floor((totalMinutes % 1440) / 60);
+      const minutes = totalMinutes % 60;
+
+      if (days > 0) return `Overdue by ${days}d ${hours}h`;
+      if (hours > 0) return `Overdue by ${hours}h ${minutes}m`;
+
+      return `Overdue by ${minutes}m`;
+    }
+
+    const totalMinutes = Math.floor(difference / 60000);
+    const days = Math.floor(totalMinutes / 1440);
+    const hours = Math.floor((totalMinutes % 1440) / 60);
+    const minutes = totalMinutes % 60;
+
+    if (days > 0) return `${days}d ${hours}h remaining`;
+    if (hours > 0) return `${hours}h ${minutes}m remaining`;
+
+    return `${minutes}m remaining`;
+  };
+
+  const deadlineStyle = (state) => {
     const styles = {
-      High: darkMode
-        ? "border-red-800 bg-red-950 text-red-300"
-        : "border-red-200 bg-red-50 text-red-700",
-
-      Medium: darkMode
-        ? "border-orange-800 bg-orange-950 text-orange-300"
-        : "border-orange-200 bg-orange-50 text-orange-700",
-
-      Low: darkMode
-        ? "border-emerald-800 bg-emerald-950 text-emerald-300"
-        : "border-emerald-200 bg-emerald-50 text-emerald-700",
+      Completed: "border-emerald-500/30 bg-emerald-500/10 text-emerald-500",
+      Overdue: "border-red-500/30 bg-red-500/10 text-red-500",
+      Urgent: "border-amber-500/30 bg-amber-500/10 text-amber-500",
+      "On Track": "border-blue-500/30 bg-blue-500/10 text-blue-500",
+      "Not Set": "border-slate-500/30 bg-slate-500/10 text-slate-500",
     };
 
-    return (
-      styles[priority] ||
-      (darkMode
-        ? "border-slate-600 bg-slate-700 text-slate-300"
-        : "border-slate-200 bg-slate-50 text-slate-600")
-    );
+    return styles[state] || styles["Not Set"];
+  };
+
+  // STATUS
+  const getStatusStyle = (status) => {
+    const styles = {
+      Assigned: "border-amber-500/30 bg-amber-500/10 text-amber-500",
+      "In Progress": "border-violet-500/30 bg-violet-500/10 text-violet-500",
+      Resolved: "border-emerald-500/30 bg-emerald-500/10 text-emerald-500",
+    };
+
+    return styles[status] || "border-slate-500/30 bg-slate-500/10 text-slate-500";
+  };
+
+  const getPriorityStyle = (priority) => {
+    const styles = {
+      High: "border-red-500/30 bg-red-500/10 text-red-500",
+      Medium: "border-orange-500/30 bg-orange-500/10 text-orange-500",
+      Low: "border-emerald-500/30 bg-emerald-500/10 text-emerald-500",
+    };
+
+    return styles[priority] || "border-slate-500/30 bg-slate-500/10 text-slate-500";
+  };
+
+  // VERIFICATION LABEL
+  const getVerificationLabel = (complaint) => {
+    if (complaint.status === "Resolved" ||
+        complaint.verificationStatus === "Approved") {
+      return "Approved";
+    }
+
+    if (complaint.verificationStatus === "Pending") {
+      return "Pending";
+    }
+
+    if (complaint.verificationStatus === "Rejected") {
+      return "Rejected";
+    }
+
+    return "Not Submitted";
+  };
+
+  const getVerificationStyle = (complaint) => {
+    const status = getVerificationLabel(complaint);
+
+    if (status === "Approved") {
+      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-500";
+    }
+    if (status === "Pending") {
+      return "border-amber-500/30 bg-amber-500/10 text-amber-500";
+    }
+    if (status === "Rejected") {
+      return "border-red-500/30 bg-red-500/10 text-red-500";
+    }
+
+    return "border-slate-500/30 bg-slate-500/10 text-slate-500";
   };
 
   // PROGRESS
-  const getProgress = (status, verificationStatus) => {
-    if (status === "Resolved" || verificationStatus === "Approved") return 100;
-    if (verificationStatus === "Pending") return 85;
-    if (status === "In Progress") return 66;
-    if (status === "Assigned") return 33;
+  const getProgress = (complaint) => {
+    if (complaint.status === "Resolved" ||
+        complaint.verificationStatus === "Approved") return 100;
+
+    if (complaint.verificationStatus === "Pending") return 90;
+    if (complaint.verificationStatus === "Rejected") return 70;
+    if (complaint.status === "In Progress") return 55;
+    if (complaint.status === "Assigned") return 20;
+
     return 0;
   };
 
-  // TOGGLE DETAILS
-  const toggleComplaint = (complaintId) => {
-    setExpandedComplaints((prev) => ({
-      ...prev,
-      [complaintId]: !prev[complaintId],
-    }));
-  };
-
-  // UPDATE STATUS
+  // START WORK
   const updateStatus = async (complaintId, status) => {
+    const target = complaints.find((item) => item._id === complaintId);
+
+    if (!target) return;
+
+    if (target.verificationStatus === "Pending") {
+      alert("This complaint is already awaiting supervisor verification.");
+      return;
+    }
+
+    if (target.status !== "Assigned" || status !== "In Progress") {
+      alert("This action is not available for the current complaint.");
+      return;
+    }
+
     try {
+      setStartingId(complaintId);
+
       const token = localStorage.getItem("token");
 
       const response = await api.patch(
@@ -239,61 +270,89 @@ function TechnicianDashboard() {
         }
       );
 
-      alert(response.data.message);
-
       setComplaints((prev) =>
-        prev.map((complaint) =>
-          complaint._id === complaintId
-            ? {
-                ...complaint,
-                status,
-                resolvedAt:
-                  status === "Resolved"
-                    ? response.data.complaint?.resolvedAt ||
-                      new Date().toISOString()
-                    : complaint.resolvedAt,
-              }
-            : complaint
+        prev.map((item) =>
+          item._id === complaintId
+            ? { ...item, ...response.data.complaint, status }
+            : item
         )
       );
+
+      setExpandedComplaints((prev) => ({
+        ...prev,
+        [complaintId]: true,
+      }));
+
+      alert("Work started successfully. You can now upload completion details.");
     } catch (error) {
       alert(
         error.response?.data?.message ||
-          "Failed to update complaint status"
+        "Failed to start work."
       );
+    } finally {
+      setStartingId(null);
     }
   };
 
-  // COMPLETION PHOTO & REMARKS SUBMISSION (FOR SUPERVISOR VERIFICATION)
-  const handleCompletionSubmit = async (complaintId, fileOverride) => {
-    const file = fileOverride || selectedFiles[complaintId];
-    const targetComplaint = complaints.find((c) => c._id === complaintId);
+  // COMPLETION SUBMISSION
+  const handleCompletionSubmit = async (complaintId) => {
+    const complaint = complaints.find((item) => item._id === complaintId);
+
+    if (!complaint) return;
+
+    if (complaint.status !== "In Progress") {
+      alert("Please start the work before submitting completion details.");
+      return;
+    }
+
+    if (complaint.verificationStatus === "Pending") {
+      alert("Your submission is already awaiting supervisor verification.");
+      return;
+    }
+
+    if (complaint.verificationStatus === "Approved") {
+      alert("This complaint has already been approved.");
+      return;
+    }
+
+    const file = selectedFiles[complaintId];
+
     const remarks = (
       resolutionRemarks[complaintId] ??
-      targetComplaint?.resolutionRemarks ??
-      ""
+      (complaint.verificationStatus === "Rejected"
+        ? ""
+        : complaint.resolutionRemarks || "")
     ).trim();
 
     if (!remarks) {
-      alert("Please enter resolution remarks describing the work performed.");
+      alert("Please enter resolution remarks.");
       return;
     }
 
-    if (!file && !targetComplaint?.completionImage) {
-      alert("Please select a completion photo before submitting.");
+    if (!file && !complaint.completionImage) {
+      alert("Please upload a completion photo.");
       return;
     }
 
-    if (file && !["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      alert("Please upload a JPG, PNG or WEBP image.");
+    if (
+      file &&
+      !["image/jpeg", "image/png", "image/webp"].includes(file.type)
+    ) {
+      alert("Only JPG, PNG or WEBP images are allowed.");
+      return;
+    }
+
+    if (file && file.size > 5 * 1024 * 1024) {
+      alert("Please upload an image smaller than 5 MB.");
       return;
     }
 
     try {
       setUploadingId(complaintId);
 
-      let imageUrl = targetComplaint?.completionImage || "";
+      let imageUrl = complaint.completionImage || "";
 
+      // Upload image to Cloudinary.
       if (file) {
         const uploadData = new FormData();
         uploadData.append("file", file);
@@ -309,45 +368,66 @@ function TechnicianDashboard() {
 
         const cloudinaryData = await cloudinaryResponse.json();
 
-        if (!cloudinaryResponse.ok) {
-          throw new Error("Image upload failed");
+        if (!cloudinaryResponse.ok || !cloudinaryData.secure_url) {
+          throw new Error(
+            cloudinaryData.error?.message || "Image upload failed."
+          );
         }
 
         imageUrl = cloudinaryData.secure_url;
       }
+
+      const token = localStorage.getItem("token");
 
       const response = await api.patch(
         `/complaints/${complaintId}/completion-photo`,
         {
           completionImage: imageUrl,
           resolutionRemarks: remarks,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         }
       );
 
-      alert(
-        response.data.message ||
-          "Completion details submitted for supervisor verification."
-      );
-
       setComplaints((prev) =>
-        prev.map((complaint) =>
-          complaint._id === complaintId
+        prev.map((item) =>
+          item._id === complaintId
             ? {
-                ...complaint,
+                ...item,
+                ...response.data.complaint,
                 completionImage: imageUrl,
                 resolutionRemarks: remarks,
                 verificationStatus: "Pending",
               }
-            : complaint
+            : item
         )
       );
 
-      setSelectedFiles((prev) => ({ ...prev, [complaintId]: null }));
+      setSelectedFiles((prev) => ({
+        ...prev,
+        [complaintId]: null,
+      }));
+
+      setResolutionRemarks((prev) => ({
+        ...prev,
+        [complaintId]: remarks,
+      }));
+
+      alert(
+        "Completion submitted successfully! Your supervisor can now verify the work."
+      );
+
+      await fetchComplaints(true);
     } catch (error) {
+      console.error("COMPLETION SUBMISSION ERROR:", error);
+
       alert(
         error.response?.data?.message ||
-          error.message ||
-          "Failed to submit completion details"
+        error.message ||
+        "Failed to submit completion details."
       );
     } finally {
       setUploadingId(null);
@@ -356,13 +436,15 @@ function TechnicianDashboard() {
 
   // DELETE RESOLVED COMPLAINT
   const deleteComplaint = async (complaintId) => {
-    const confirmDelete = window.confirm(
+    const confirmed = window.confirm(
       "Are you sure you want to delete this resolved complaint?"
     );
 
-    if (!confirmDelete) return;
+    if (!confirmed) return;
 
     try {
+      setDeletingId(complaintId);
+
       const token = localStorage.getItem("token");
 
       const response = await api.delete(
@@ -374,31 +456,27 @@ function TechnicianDashboard() {
         }
       );
 
-      alert(response.data.message);
-
       setComplaints((prev) =>
-        prev.filter((complaint) => complaint._id !== complaintId)
+        prev.filter((item) => item._id !== complaintId)
       );
 
-      setExpandedComplaints((prev) => {
-        const updated = { ...prev };
-        delete updated[complaintId];
-        return updated;
-      });
+      alert(response.data.message || "Complaint deleted successfully.");
     } catch (error) {
       alert(
         error.response?.data?.message ||
-          "Failed to delete complaint"
+        "Failed to delete complaint."
       );
+    } finally {
+      setDeletingId(null);
     }
   };
 
-  // FILTER + SEARCH
+  // FILTERS
   const filteredComplaints = useMemo(() => {
-    const search = searchTerm.toLowerCase().trim();
+    const search = searchTerm.trim().toLowerCase();
 
     return complaints.filter((complaint) => {
-      const searchableText = [
+      const searchable = [
         complaint._id,
         complaint.category,
         complaint.block,
@@ -409,18 +487,15 @@ function TechnicianDashboard() {
         complaint.priority,
         complaint.user?.name,
         complaint.user?.email,
-        complaint.user?.classSection,
       ]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
 
-      const matchesSearch =
-        !search || searchableText.includes(search);
+      const matchesSearch = !search || searchable.includes(search);
 
       const matchesStatus =
-        statusFilter === "All" ||
-        complaint.status === statusFilter;
+        statusFilter === "All" || complaint.status === statusFilter;
 
       const matchesPriority =
         priorityFilter === "All" ||
@@ -430,47 +505,102 @@ function TechnicianDashboard() {
     });
   }, [complaints, searchTerm, statusFilter, priorityFilter]);
 
-  const sortedComplaints = useMemo(
-    () =>
-      [...filteredComplaints].sort(
-        (a, b) =>
-          new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
-      ),
-    [filteredComplaints]
-  );
+  const sortedComplaints = useMemo(() => {
+    return [...filteredComplaints].sort((a, b) => {
+      const priorityOrder = { High: 0, Medium: 1, Low: 2 };
+
+      const priorityDifference =
+        (priorityOrder[a.priority] ?? 3) -
+        (priorityOrder[b.priority] ?? 3);
+
+      if (priorityDifference !== 0) return priorityDifference;
+
+      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+    });
+  }, [filteredComplaints]);
 
   const displayedComplaints = showAllComplaints
     ? sortedComplaints
-    : sortedComplaints.slice(0, 4);
+    : sortedComplaints.slice(0, 5);
 
   // STATISTICS
   const totalComplaints = complaints.length;
 
-  const assignedComplaints = complaints.filter(
-    (complaint) => complaint.status === "Assigned"
+  const assignedCount = complaints.filter(
+    (item) => item.status === "Assigned"
   ).length;
 
-  const inProgressComplaints = complaints.filter(
-    (complaint) => complaint.status === "In Progress"
+  const inProgressCount = complaints.filter(
+    (item) => item.status === "In Progress"
   ).length;
 
-  const resolvedComplaints = complaints.filter(
-    (complaint) => complaint.status === "Resolved"
+  const pendingVerificationCount = complaints.filter(
+    (item) => item.verificationStatus === "Pending"
   ).length;
 
-  const highPriorityComplaints = complaints.filter(
-    (complaint) => complaint.priority === "High"
+  const resolvedCount = complaints.filter(
+    (item) => item.status === "Resolved"
   ).length;
 
-  const getFilterCount = (filter) => {
-    if (filter === "All") return totalComplaints;
-    if (filter === "Assigned") return assignedComplaints;
-    if (filter === "In Progress") return inProgressComplaints;
-    if (filter === "Resolved") return resolvedComplaints;
-    return 0;
+  const highPriorityCount = complaints.filter(
+    (item) => item.priority === "High" &&
+      item.status !== "Resolved"
+  ).length;
+
+  const overdueCount = complaints.filter(
+    (item) => getDeadlineState(item) === "Overdue"
+  ).length;
+
+  const stats = [
+    {
+      title: "Total Assigned",
+      value: totalComplaints,
+      detail: "All maintenance requests",
+      icon: "▤",
+      color: "indigo",
+      filter: "All",
+    },
+    {
+      title: "Awaiting Start",
+      value: assignedCount,
+      detail: "Work not started",
+      icon: "◷",
+      color: "amber",
+      filter: "Assigned",
+    },
+    {
+      title: "In Progress",
+      value: inProgressCount,
+      detail: "Active maintenance work",
+      icon: "⚙",
+      color: "violet",
+      filter: "In Progress",
+    },
+    {
+      title: "Resolved",
+      value: resolvedCount,
+      detail: "Supervisor approved",
+      icon: "✓",
+      color: "emerald",
+      filter: "Resolved",
+    },
+  ];
+
+  const statColors = {
+    indigo: darkMode
+      ? "bg-indigo-500/10 text-indigo-300"
+      : "bg-indigo-50 text-indigo-600",
+    amber: darkMode
+      ? "bg-amber-500/10 text-amber-300"
+      : "bg-amber-50 text-amber-600",
+    violet: darkMode
+      ? "bg-violet-500/10 text-violet-300"
+      : "bg-violet-50 text-violet-600",
+    emerald: darkMode
+      ? "bg-emerald-500/10 text-emerald-300"
+      : "bg-emerald-50 text-emerald-600",
   };
 
-  // RESET FILTERS
   const resetFilters = () => {
     setSearchTerm("");
     setStatusFilter("All");
@@ -478,60 +608,14 @@ function TechnicianDashboard() {
     setShowAllComplaints(false);
   };
 
-  // STATS CONFIGURATION
-  const stats = [
-    {
-      label: "Total Assigned",
-      value: totalComplaints,
-      note: "All assigned maintenance requests",
-      icon: "📋",
-      color: "indigo",
-      filter: "All",
-    },
-    {
-      label: "Pending Work",
-      value: assignedComplaints,
-      note: "Waiting to be started",
-      icon: "⏳",
-      color: "amber",
-      filter: "Assigned",
-    },
-    {
-      label: "In Progress",
-      value: inProgressComplaints,
-      note: "Currently being handled",
-      icon: "🔧",
-      color: "violet",
-      filter: "In Progress",
-    },
-    {
-      label: "Resolved",
-      value: resolvedComplaints,
-      note: "Successfully completed",
-      icon: "✓",
-      color: "emerald",
-      filter: "Resolved",
-    },
-  ];
-
-  const colorStyles = {
-    indigo: darkMode
-      ? "bg-indigo-950/70 text-indigo-300"
-      : "bg-indigo-50 text-indigo-600",
-    amber: darkMode
-      ? "bg-amber-950/70 text-amber-300"
-      : "bg-amber-50 text-amber-600",
-    violet: darkMode
-      ? "bg-violet-950/70 text-violet-300"
-      : "bg-violet-50 text-violet-600",
-    emerald: darkMode
-      ? "bg-emerald-950/70 text-emerald-300"
-      : "bg-emerald-50 text-emerald-600",
+  const toggleComplaint = (id) => {
+    setExpandedComplaints((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
   };
 
-  const filters = ["All", "Assigned", "In Progress", "Resolved"];
-
-  // LOADING SCREEN
+  // LOADING
   if (loading) {
     return (
       <div className={`min-h-screen ${pageBg}`}>
@@ -541,38 +625,31 @@ function TechnicianDashboard() {
           onLogout={() => setShowLogout(true)}
         />
 
-        <main className="min-h-screen p-5 transition-all duration-300 lg:ml-64 sm:p-8">
-          <div className="mb-7 flex items-center justify-between">
-            <div className="pl-14 lg:pl-0">
-              <div className={`h-3 w-36 animate-pulse rounded ${softBg}`} />
-              <div className={`mt-3 h-7 w-60 animate-pulse rounded ${softBg}`} />
-            </div>
-            <div className={`h-10 w-24 animate-pulse rounded-xl ${softBg}`} />
+        <main className="min-h-screen p-6 lg:ml-64">
+          <div className="mb-8 pl-14 lg:pl-0">
+            <div className={`h-4 w-40 animate-pulse rounded ${softBg}`} />
+            <div className={`mt-3 h-8 w-64 animate-pulse rounded ${softBg}`} />
           </div>
 
-          <div className="space-y-6">
-            <div className={`h-64 animate-pulse rounded-3xl ${softBg}`} />
+          <div className={`h-56 animate-pulse rounded-3xl ${softBg}`} />
 
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {[1, 2, 3, 4].map((item) => (
-                <div
-                  key={item}
-                  className={`h-36 animate-pulse rounded-2xl ${softBg}`}
-                />
-              ))}
-            </div>
-
-            <div className={`h-48 animate-pulse rounded-3xl ${softBg}`} />
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {[1, 2, 3, 4].map((item) => (
+              <div
+                key={item}
+                className={`h-36 animate-pulse rounded-2xl ${softBg}`}
+              />
+            ))}
           </div>
+
+          <div className={`mt-6 h-96 animate-pulse rounded-3xl ${softBg}`} />
         </main>
       </div>
     );
   }
 
   return (
-    <div
-      className={`min-h-screen transition-colors duration-300 ${pageBg}`}
-    >
+    <div className={`min-h-screen ${pageBg} transition-colors duration-300`}>
       <TechnicianSidebar
         activeFilter={statusFilter}
         onFilterChange={(filter) => {
@@ -583,20 +660,22 @@ function TechnicianDashboard() {
       />
 
       <main className="min-h-screen transition-all duration-300 lg:ml-64">
+
         {/* HEADER */}
         <header
-          className={`sticky top-0 z-20 border-b px-5 py-4 shadow-sm backdrop-blur-xl sm:px-8 ${headerBg}`}
+          className={`sticky top-0 z-30 border-b px-5 py-4 backdrop-blur-xl sm:px-8 ${
+            darkMode
+              ? "border-slate-800 bg-slate-950/90"
+              : "border-slate-200 bg-white/90"
+          }`}
         >
           <div className="flex items-center justify-between gap-4">
-            <div className="pl-14 lg:pl-0">
-              <p
-                className={`text-xs font-bold uppercase tracking-[0.2em] ${mutedText}`}
-              >
+            <div className="pl-12 lg:pl-0">
+              <p className={`text-[10px] font-bold uppercase tracking-[0.22em] ${mutedText}`}>
                 CampusFix / Maintenance Operations
               </p>
-
-              <h1 className={`mt-1 text-lg font-black sm:text-xl ${heading}`}>
-                Technician Dashboard
+              <h1 className={`mt-1 text-xl font-black ${heading}`}>
+                Technician Workspace
               </h1>
             </div>
 
@@ -605,7 +684,7 @@ function TechnicianDashboard() {
                 type="button"
                 onClick={() => fetchComplaints(true)}
                 disabled={refreshing}
-                className={`flex h-11 items-center gap-2 rounded-xl border px-3 text-sm font-bold transition ${
+                className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-bold transition ${
                   darkMode
                     ? "border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700"
                     : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
@@ -613,27 +692,20 @@ function TechnicianDashboard() {
               >
                 <span className={refreshing ? "animate-spin" : ""}>↻</span>
                 <span className="hidden sm:inline">
-                  {refreshing ? "Refreshing..." : "Refresh"}
+                  {refreshing ? "Refreshing" : "Refresh"}
                 </span>
               </button>
 
-              <div
-                className={`hidden items-center gap-3 rounded-xl border px-3 py-2 sm:flex ${
-                  darkMode
-                    ? "border-slate-700 bg-slate-800"
-                    : "border-slate-200 bg-white"
-                }`}
-              >
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600 text-sm font-black text-white">
+              <div className={`hidden items-center gap-3 rounded-xl border px-3 py-2 sm:flex ${card}`}>
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 font-black text-white">
                   {technicianName.charAt(0).toUpperCase()}
                 </div>
-
                 <div>
-                  <p className={`text-xs font-extrabold ${heading}`}>
+                  <p className={`text-xs font-black ${heading}`}>
                     {technicianName}
                   </p>
                   <p className={`text-[10px] ${mutedText}`}>
-                    Technician
+                    {specialization}
                   </p>
                 </div>
               </div>
@@ -641,30 +713,35 @@ function TechnicianDashboard() {
           </div>
         </header>
 
-        <div className="space-y-7 p-5 sm:p-8">
-          {/* HERO */}
-          <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-indigo-700 via-indigo-600 to-violet-700 p-7 text-white shadow-xl shadow-indigo-950/15 sm:p-9">
-            <div className="pointer-events-none absolute -right-16 -top-20 h-72 w-72 rounded-full border-[35px] border-white/5" />
-            <div className="pointer-events-none absolute -bottom-28 right-44 h-64 w-64 rounded-full bg-white/5 blur-2xl" />
+        <div className="space-y-7 p-5 sm:p-7 xl:p-8">
 
-            <div className="relative flex flex-col justify-between gap-7 lg:flex-row lg:items-center">
-              <div className="max-w-2xl">
-                <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-bold backdrop-blur">
-                  <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-300" />
-                  TECHNICIAN WORKSPACE
+          {/* HERO */}
+          <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-950 via-indigo-950 to-violet-900 p-7 text-white shadow-xl sm:p-9">
+            <div className="pointer-events-none absolute -right-16 -top-24 h-80 w-80 rounded-full border-[45px] border-white/5" />
+            <div className="pointer-events-none absolute bottom-0 right-1/4 h-48 w-48 rounded-full bg-indigo-400/10 blur-3xl" />
+
+            <div className="relative grid gap-8 lg:grid-cols-[1fr_270px] lg:items-center">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-indigo-100">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                  Technician Operations Portal
                 </div>
 
-                <p className="text-xl font-semibold text-indigo-100 sm:text-2xl">
+                <p className="mt-5 text-lg font-semibold text-indigo-200">
                   Welcome back, {technicianName}
                 </p>
 
-                <h2 className="mt-3 text-3xl font-black leading-tight tracking-tight sm:text-4xl">
-                  Keep Your Campus Running Smoothly.
+                <h2 className="mt-2 max-w-2xl text-3xl font-black leading-tight tracking-tight sm:text-4xl">
+                  Deliver reliable maintenance.
+                  <span className="block text-indigo-300">
+                    Keep your campus running.
+                  </span>
                 </h2>
 
-                <p className="mt-3 max-w-xl text-sm leading-6 text-indigo-100 sm:text-base">
-                  Manage your assigned maintenance requests, track work
-                  progress, and document completed tasks with photo proof.
+                <p className="mt-4 max-w-xl text-sm leading-7 text-slate-300">
+                  Manage assigned complaints, monitor deadlines, document
+                  completed work and submit every maintenance task for
+                  supervisor verification.
                 </p>
 
                 <div className="mt-6 flex flex-wrap gap-3">
@@ -672,76 +749,105 @@ function TechnicianDashboard() {
                     type="button"
                     onClick={() => {
                       resetFilters();
-                      document
-                        .getElementById("assigned-work")
-                        ?.scrollIntoView({ behavior: "smooth" });
+                      document.getElementById("my-work")?.scrollIntoView({
+                        behavior: "smooth",
+                      });
                     }}
-                    className="rounded-xl bg-white px-5 py-3 text-sm font-black text-indigo-700 shadow-lg transition hover:-translate-y-0.5 hover:bg-indigo-50"
+                    className="rounded-xl bg-white px-5 py-3 text-xs font-black text-indigo-950 transition hover:-translate-y-0.5 hover:bg-indigo-50"
                   >
-                    View My Tasks →
+                    View Assigned Work →
                   </button>
 
                   <button
                     type="button"
                     onClick={() => {
                       setStatusFilter("In Progress");
-                      document
-                        .getElementById("assigned-work")
-                        ?.scrollIntoView({ behavior: "smooth" });
+                      document.getElementById("my-work")?.scrollIntoView({
+                        behavior: "smooth",
+                      });
                     }}
-                    className="rounded-xl border border-white/30 bg-white/10 px-5 py-3 text-sm font-bold text-white backdrop-blur transition hover:bg-white/20"
+                    className="rounded-xl border border-white/20 bg-white/10 px-5 py-3 text-xs font-bold text-white transition hover:bg-white/20"
                   >
                     Continue Active Work
                   </button>
                 </div>
               </div>
 
-              <div className="hidden min-w-56 rounded-3xl border border-white/15 bg-white/10 p-6 text-center backdrop-blur-md lg:block">
-                <div className="text-5xl">🛠️</div>
-                <p className="mt-3 text-sm font-black">Maintenance Team</p>
-                <p className="mt-1 text-xs text-indigo-100">
-                  {specialization}
+              <div className="rounded-3xl border border-white/15 bg-white/10 p-6 backdrop-blur-md">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-200">
+                  Your Workload
+                </p>
+                <p className="mt-3 text-5xl font-black">
+                  {totalComplaints.toString().padStart(2, "0")}
+                </p>
+                <p className="mt-1 text-xs text-indigo-200">
+                  Assigned maintenance requests
                 </p>
 
-                <div className="mt-5 border-t border-white/15 pt-4">
-                  <p className="text-3xl font-black">{totalComplaints}</p>
-                  <p className="mt-1 text-xs text-indigo-100">
-                    Assigned Tasks
-                  </p>
+                <div className="mt-6 grid grid-cols-2 gap-3 border-t border-white/15 pt-5">
+                  <div>
+                    <p className="text-2xl font-black text-amber-300">
+                      {pendingVerificationCount}
+                    </p>
+                    <p className="mt-1 text-[10px] text-indigo-100">
+                      Awaiting Approval
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-black text-red-300">
+                      {overdueCount}
+                    </p>
+                    <p className="mt-1 text-[10px] text-indigo-100">
+                      Overdue Tasks
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
           </section>
 
-          {/* STATISTICS */}
+          {/* ERROR */}
+          {errorMessage && (
+            <div className="flex items-center justify-between gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 p-4">
+              <p className="text-sm font-semibold text-red-500">
+                {errorMessage}
+              </p>
+              <button
+                type="button"
+                onClick={() => fetchComplaints(true)}
+                className="shrink-0 rounded-lg bg-red-600 px-3 py-2 text-xs font-bold text-white"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
+          {/* STATS */}
           <section>
-            <div className="mb-4 flex items-end justify-between gap-3">
+            <div className="mb-4 flex items-end justify-between">
               <div>
-                <p
-                  className={`text-xs font-bold uppercase tracking-widest ${mutedText}`}
-                >
-                  OVERVIEW
+                <p className={`text-[10px] font-bold uppercase tracking-[0.2em] ${mutedText}`}>
+                  Performance Overview
                 </p>
                 <h2 className={`mt-1 text-xl font-black ${heading}`}>
                   Work Summary
                 </h2>
               </div>
-
-              <p className={`hidden text-xs font-semibold sm:block ${mutedText}`}>
-                Select a card to filter tasks
-              </p>
+              <span className={`hidden text-xs sm:block ${mutedText}`}>
+                Select a card to filter complaints
+              </span>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {stats.map((stat) => (
                 <button
-                  key={stat.label}
+                  key={stat.title}
                   type="button"
                   onClick={() => {
                     setStatusFilter(stat.filter);
                     setShowAllComplaints(false);
                   }}
-                  className={`group rounded-2xl border p-5 text-left shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-lg ${
+                  className={`rounded-2xl border p-5 text-left transition duration-200 hover:-translate-y-1 hover:shadow-lg ${
                     statusFilter === stat.filter
                       ? "border-indigo-500 ring-2 ring-indigo-500/20"
                       : card
@@ -749,153 +855,101 @@ function TechnicianDashboard() {
                 >
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className={`text-sm font-bold ${mutedText}`}>
-                        {stat.label}
+                      <p className={`text-xs font-bold ${mutedText}`}>
+                        {stat.title}
                       </p>
                       <p className={`mt-4 text-3xl font-black ${heading}`}>
                         {stat.value}
                       </p>
                     </div>
-
-                    <div
-                      className={`flex h-12 w-12 items-center justify-center rounded-2xl text-2xl ${colorStyles[stat.color]}`}
-                    >
+                    <div className={`flex h-12 w-12 items-center justify-center rounded-2xl text-2xl font-black ${statColors[stat.color]}`}>
                       {stat.icon}
                     </div>
                   </div>
-
-                  <p className={`mt-2 text-xs font-medium ${mutedText}`}>
-                    {stat.note}
+                  <p className={`mt-2 text-[11px] ${mutedText}`}>
+                    {stat.detail}
                   </p>
-
-                  <div
-                    className={`mt-4 h-1 overflow-hidden rounded-full ${
-                      darkMode ? "bg-slate-700" : "bg-slate-100"
-                    }`}
-                  >
-                    <div
-                      className={`h-full rounded-full ${
-                        stat.color === "indigo"
-                          ? "bg-indigo-500"
-                          : stat.color === "amber"
-                            ? "bg-amber-500"
-                            : stat.color === "violet"
-                              ? "bg-violet-500"
-                              : "bg-emerald-500"
-                      }`}
-                      style={{
-                        width: `${
-                          totalComplaints
-                            ? Math.min(
-                                (stat.value / totalComplaints) * 100,
-                                100
-                              )
-                            : 0
-                        }%`,
-                      }}
-                    />
-                  </div>
                 </button>
               ))}
             </div>
           </section>
 
-          {/* PRIORITY ALERT */}
-          {highPriorityComplaints > 0 && (
-            <section
-              className={`flex flex-col gap-4 rounded-2xl border p-5 sm:flex-row sm:items-center sm:justify-between ${
-                darkMode
-                  ? "border-red-900 bg-red-950/40"
-                  : "border-red-200 bg-red-50"
-              }`}
-            >
-              <div className="flex items-start gap-4">
-                <div
-                  className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-xl ${
-                    darkMode ? "bg-red-900/50" : "bg-red-100"
-                  }`}
-                >
-                  🚨
-                </div>
-
-                <div>
-                  <h3
-                    className={`font-extrabold ${
-                      darkMode ? "text-red-300" : "text-red-800"
-                    }`}
-                  >
-                    {highPriorityComplaints} High-Priority{" "}
-                    {highPriorityComplaints === 1
-                      ? "Complaint"
-                      : "Complaints"}
-                  </h3>
-
-                  <p
-                    className={`mt-1 text-sm ${
-                      darkMode ? "text-red-200" : "text-red-600"
-                    }`}
-                  >
-                    Review these maintenance requests carefully.
+          {/* OPERATIONAL ALERTS */}
+          {(highPriorityCount > 0 || overdueCount > 0 || pendingVerificationCount > 0) && (
+            <section className="grid gap-3 md:grid-cols-3">
+              {highPriorityCount > 0 && (
+                <div className="rounded-2xl border border-red-500/25 bg-red-500/5 p-4">
+                  <p className="text-xs font-bold text-red-500">
+                    HIGH PRIORITY
+                  </p>
+                  <p className={`mt-2 text-2xl font-black ${heading}`}>
+                    {highPriorityCount}
+                  </p>
+                  <p className={`mt-1 text-xs ${mutedText}`}>
+                    High-priority active complaints
                   </p>
                 </div>
-              </div>
+              )}
 
-              <button
-                type="button"
-                onClick={() => {
-                  setPriorityFilter("High");
-                  setStatusFilter("All");
-                  setShowAllComplaints(true);
-                }}
-                className="w-fit rounded-xl bg-red-600 px-5 py-3 text-sm font-black text-white transition hover:bg-red-700"
-              >
-                View High Priority →
-              </button>
+              {overdueCount > 0 && (
+                <div className="rounded-2xl border border-orange-500/25 bg-orange-500/5 p-4">
+                  <p className="text-xs font-bold text-orange-500">
+                    DEADLINE ALERT
+                  </p>
+                  <p className={`mt-2 text-2xl font-black ${heading}`}>
+                    {overdueCount}
+                  </p>
+                  <p className={`mt-1 text-xs ${mutedText}`}>
+                    Tasks past their deadline
+                  </p>
+                </div>
+              )}
+
+              {pendingVerificationCount > 0 && (
+                <div className="rounded-2xl border border-amber-500/25 bg-amber-500/5 p-4">
+                  <p className="text-xs font-bold text-amber-500">
+                    SUPERVISOR REVIEW
+                  </p>
+                  <p className={`mt-2 text-2xl font-black ${heading}`}>
+                    {pendingVerificationCount}
+                  </p>
+                  <p className={`mt-1 text-xs ${mutedText}`}>
+                    Submissions awaiting approval
+                  </p>
+                </div>
+              )}
             </section>
           )}
 
-          {/* TASK MANAGEMENT */}
+          {/* COMPLAINT MANAGEMENT */}
           <section
-            id="assigned-work"
+            id="my-work"
             className={`overflow-hidden rounded-3xl border shadow-sm ${panel}`}
           >
             <div className={`border-b p-5 sm:p-6 ${borderLine}`}>
-              <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-center">
+              <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                 <div>
-                  <p
-                    className={`text-xs font-bold uppercase tracking-widest ${mutedText}`}
-                  >
-                    MAINTENANCE MANAGEMENT
+                  <p className={`text-[10px] font-bold uppercase tracking-widest ${mutedText}`}>
+                    Maintenance Management
                   </p>
-
                   <h2 className={`mt-1 text-xl font-black ${heading}`}>
                     My Assigned Complaints
                   </h2>
-
-                  <p className={`mt-1 text-sm ${mutedText}`}>
-                    Review, search and update your maintenance tasks.
+                  <p className={`mt-1 text-xs ${mutedText}`}>
+                    Review task details, deadlines and completion requirements.
                   </p>
                 </div>
 
-                <div
-                  className={`rounded-xl border px-4 py-2.5 text-xs font-bold ${
-                    darkMode
-                      ? "border-slate-700 bg-slate-800 text-slate-300"
-                      : "border-slate-200 bg-slate-50 text-slate-600"
-                  }`}
-                >
-                  {sortedComplaints.length} Matching Tasks
+                <div className={`rounded-xl border px-4 py-2 text-xs font-bold ${card}`}>
+                  {sortedComplaints.length} Matching Requests
                 </div>
               </div>
 
               {/* SEARCH */}
-              <div className="relative mt-6">
-                <span
-                  className={`absolute left-4 top-1/2 -translate-y-1/2 ${mutedText}`}
-                >
-                  🔍
+              <div className="relative mt-5">
+                <span className={`absolute left-4 top-1/2 -translate-y-1/2 ${mutedText}`}>
+                  ⌕
                 </span>
-
                 <input
                   type="text"
                   value={searchTerm}
@@ -903,30 +957,15 @@ function TechnicianDashboard() {
                     setSearchTerm(e.target.value);
                     setShowAllComplaints(false);
                   }}
-                  placeholder="Search by complaint, category, room or student..."
-                  className={`w-full rounded-xl border py-3.5 pl-11 pr-12 text-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 ${
-                    darkMode
-                      ? "border-slate-700 bg-slate-800 text-white placeholder:text-slate-500"
-                      : "border-slate-200 bg-slate-50 text-slate-800 placeholder:text-slate-400"
-                  }`}
+                  placeholder="Search complaint, room, block, category or student..."
+                  className={`w-full rounded-xl border py-3.5 pl-11 pr-4 text-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 ${inputStyle}`}
                 />
-
-                {searchTerm && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchTerm("")}
-                    className={`absolute right-4 top-1/2 -translate-y-1/2 ${mutedText}`}
-                    aria-label="Clear search"
-                  >
-                    ✕
-                  </button>
-                )}
               </div>
 
               {/* FILTERS */}
-              <div className="mt-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="mt-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                 <div className="flex gap-2 overflow-x-auto pb-1">
-                  {filters.map((filter) => (
+                  {["All", "Assigned", "In Progress", "Resolved"].map((filter) => (
                     <button
                       key={filter}
                       type="button"
@@ -934,42 +973,27 @@ function TechnicianDashboard() {
                         setStatusFilter(filter);
                         setShowAllComplaints(false);
                       }}
-                      className={`flex shrink-0 items-center gap-2 rounded-xl border px-3.5 py-2.5 text-xs font-black transition ${
+                      className={`shrink-0 rounded-xl border px-4 py-2.5 text-xs font-bold transition ${
                         statusFilter === filter
-                          ? "border-indigo-600 bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
+                          ? "border-indigo-600 bg-indigo-600 text-white"
                           : darkMode
                             ? "border-slate-700 bg-slate-800 text-slate-300 hover:border-indigo-500"
-                            : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-indigo-300"
                       }`}
                     >
                       {filter}
-                      <span
-                        className={`rounded-md px-1.5 py-0.5 text-[10px] ${
-                          statusFilter === filter
-                            ? "bg-white/20"
-                            : darkMode
-                              ? "bg-slate-700"
-                              : "bg-slate-100"
-                        }`}
-                      >
-                        {getFilterCount(filter)}
-                      </span>
                     </button>
                   ))}
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap gap-2">
                   <select
                     value={priorityFilter}
                     onChange={(e) => {
                       setPriorityFilter(e.target.value);
                       setShowAllComplaints(false);
                     }}
-                    className={`min-w-36 rounded-xl border px-3.5 py-2.5 text-xs font-bold outline-none focus:border-indigo-500 ${
-                      darkMode
-                        ? "border-slate-700 bg-slate-800 text-slate-200"
-                        : "border-slate-200 bg-white text-slate-700"
-                    }`}
+                    className={`rounded-xl border px-3 py-2.5 text-xs font-bold outline-none focus:border-indigo-500 ${inputStyle}`}
                   >
                     <option value="All">All Priorities</option>
                     <option value="High">High Priority</option>
@@ -980,40 +1004,32 @@ function TechnicianDashboard() {
                   <button
                     type="button"
                     onClick={resetFilters}
-                    className={`rounded-xl border px-4 py-2.5 text-xs font-bold transition ${
-                      darkMode
-                        ? "border-slate-700 text-slate-300 hover:bg-slate-800"
-                        : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                    }`}
+                    className={`rounded-xl border px-4 py-2.5 text-xs font-bold ${card} ${bodyText}`}
                   >
-                    Reset Filters
+                    Reset
                   </button>
                 </div>
               </div>
             </div>
 
-            {/* COMPLAINT LIST HEADER */}
-            <div className="flex flex-col justify-between gap-3 px-5 py-5 sm:flex-row sm:items-center sm:px-6">
+            {/* LIST HEADING */}
+            <div className="flex items-center justify-between gap-3 px-5 py-5 sm:px-6">
               <div>
-                <h3 className={`text-lg font-black ${heading}`}>
-                  {statusFilter === "All"
-                    ? "All Assigned Tasks"
-                    : `${statusFilter} Tasks`}
+                <h3 className={`font-black ${heading}`}>
+                  {statusFilter === "All" ? "All Maintenance Requests" : `${statusFilter} Requests`}
                 </h3>
-
-                <p className={`mt-1 text-xs ${mutedText}`}>
-                  Showing {displayedComplaints.length} of{" "}
-                  {sortedComplaints.length} matching complaints
+                <p className={`mt-1 text-[11px] ${mutedText}`}>
+                  {sortedComplaints.length} complaints found
                 </p>
               </div>
 
-              {sortedComplaints.length > 4 && (
+              {sortedComplaints.length > 5 && (
                 <button
                   type="button"
                   onClick={() => setShowAllComplaints((prev) => !prev)}
-                  className="w-fit rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-black text-white transition hover:bg-indigo-700"
+                  className="rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-indigo-700"
                 >
-                  {showAllComplaints ? "Show Recent ↑" : "View All Tasks →"}
+                  {showAllComplaints ? "Show Less" : "View All"}
                 </button>
               )}
             </div>
@@ -1021,350 +1037,317 @@ function TechnicianDashboard() {
             {/* EMPTY STATE */}
             {sortedComplaints.length === 0 ? (
               <div className="px-6 py-16 text-center">
-                <div
-                  className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full text-4xl ${
-                    darkMode ? "bg-slate-800" : "bg-slate-100"
-                  }`}
-                >
-                  🔍
+                <div className={`mx-auto flex h-16 w-16 items-center justify-center rounded-2xl text-3xl ${softBg}`}>
+                  ▤
                 </div>
-
-                <h3 className={`mt-5 text-xl font-black ${heading}`}>
+                <h3 className={`mt-4 text-lg font-black ${heading}`}>
                   No Complaints Found
                 </h3>
-
-                <p className={`mx-auto mt-2 max-w-md text-sm ${mutedText}`}>
-                  No assigned maintenance requests match your current
-                  search or filters.
+                <p className={`mt-2 text-sm ${mutedText}`}>
+                  Try changing your search or filters.
                 </p>
-
                 <button
                   type="button"
                   onClick={resetFilters}
-                  className="mt-5 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white hover:bg-indigo-700"
+                  className="mt-5 rounded-xl bg-indigo-600 px-5 py-3 text-xs font-bold text-white"
                 >
-                  Clear All Filters
+                  Clear Filters
                 </button>
               </div>
             ) : (
               <div className="space-y-4 px-5 pb-6 sm:px-6">
                 {displayedComplaints.map((complaint, index) => {
-                  const isExpanded = expandedComplaints[complaint._id];
-                  const progress = getProgress(complaint.status, complaint.verificationStatus);
+                  const id = complaint._id;
+                  const expanded = Boolean(expandedComplaints[id]);
                   const deadlineState = getDeadlineState(complaint);
+                  const progress = getProgress(complaint);
+                  const verification = getVerificationLabel(complaint);
+                  const isPending = verification === "Pending";
+                  const isRejected = verification === "Rejected";
+                  const isResolved = complaint.status === "Resolved";
+                  const isAssigned = complaint.status === "Assigned";
+                  const isInProgress = complaint.status === "In Progress";
 
                   return (
                     <article
-                      key={complaint._id}
+                      key={id}
                       className={`overflow-hidden rounded-2xl border transition duration-200 ${
-                        isExpanded
-                          ? darkMode
-                            ? "border-indigo-700 shadow-lg shadow-black/20"
-                            : "border-indigo-200 shadow-lg shadow-indigo-950/5"
+                        expanded
+                          ? "border-indigo-500/50 shadow-lg"
                           : card
                       }`}
                     >
-                      {/* COMPLAINT SUMMARY */}
+                      {/* COMPLAINT CARD */}
                       <div className="p-5 sm:p-6">
                         <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
-                          <div className="flex min-w-0 items-start gap-4">
-                            <div
-                              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-sm font-black ${
-                                darkMode
-                                  ? "bg-indigo-950 text-indigo-300"
-                                  : "bg-indigo-50 text-indigo-600"
-                              }`}
-                            >
+                          <div className="flex min-w-0 gap-4">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-xs font-black text-white">
                               {String(index + 1).padStart(2, "0")}
                             </div>
 
                             <div className="min-w-0">
                               <div className="mb-2 flex flex-wrap items-center gap-2">
-                                <span className="text-[10px] font-extrabold uppercase tracking-widest text-indigo-500">
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-500">
                                   Maintenance Request
                                 </span>
-
-                                <span
-                                  className={`rounded-full border px-2.5 py-1 text-[10px] font-extrabold ${getPriorityStyle(
-                                    complaint.priority
-                                  )}`}
-                                >
+                                <span className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${getPriorityStyle(complaint.priority)}`}>
                                   {complaint.priority || "Normal"} Priority
                                 </span>
                               </div>
 
-                              <h4 className={`text-lg font-black sm:text-xl ${heading}`}>
+                              <h3 className={`text-lg font-black ${heading}`}>
                                 {complaint.category || "Maintenance Issue"}
-                              </h4>
+                              </h3>
 
-                              <p className={`mt-1 text-sm ${mutedText}`}>
-                                📍 {complaint.block || "Unknown Block"}
-                                {complaint.floor
-                                  ? ` • Floor ${complaint.floor}`
-                                  : ""}
-                                {" • "}Room {complaint.room || "N/A"}
+                              <p className={`mt-1 text-xs ${mutedText}`}>
+                                {complaint.block || "Block not specified"}
+                                {" · "}
+                                Room {complaint.room || "N/A"}
+                                {complaint.floor ? ` · Floor ${complaint.floor}` : ""}
+                              </p>
+
+                              <p className={`mt-2 text-[10px] ${mutedText}`}>
+                                Complaint ID: {String(id).slice(-10).toUpperCase()}
                               </p>
                             </div>
                           </div>
 
-                          <span
-                            className={`w-fit shrink-0 rounded-full border px-4 py-2 text-xs font-extrabold ${getStatusStyle(
-                              complaint.status
-                            )}`}
-                          >
-                            {complaint.status || "Pending"}
-                          </span>
+                          <div className="flex flex-wrap gap-2">
+                            <span className={`rounded-full border px-3 py-1.5 text-[10px] font-bold ${getStatusStyle(complaint.status)}`}>
+                              {complaint.status || "Unknown"}
+                            </span>
+                            <span className={`rounded-full border px-3 py-1.5 text-[10px] font-bold ${getVerificationStyle(complaint)}`}>
+                              {verification === "Not Submitted"
+                                ? "Verification: Not Submitted"
+                                : `Verification: ${verification}`}
+                            </span>
+                          </div>
                         </div>
 
-                        {/* QUICK DETAILS */}
-                        <div
-                          className={`mt-5 grid gap-3 border-t pt-5 sm:grid-cols-2 lg:grid-cols-4 ${borderLine}`}
-                        >
+                        {/* SUMMARY GRID */}
+                        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                           <div className={`rounded-xl p-4 ${softBg}`}>
-                            <p className={`text-[10px] font-extrabold uppercase tracking-widest ${mutedText}`}>
+                            <p className={`text-[10px] font-bold uppercase tracking-wider ${mutedText}`}>
                               Reported By
                             </p>
                             <p className={`mt-2 truncate text-sm font-bold ${heading}`}>
                               {complaint.user?.name || "Unknown Student"}
                             </p>
-                            {complaint.mobileNumber && (
-                              <p className="mt-1 text-xs font-semibold text-emerald-500">
-                                📞 {complaint.mobileNumber}
-                              </p>
-                            )}
+                            <p className={`mt-1 truncate text-[10px] ${mutedText}`}>
+                              {complaint.user?.email || "Email unavailable"}
+                            </p>
                           </div>
 
                           <div className={`rounded-xl p-4 ${softBg}`}>
-                            <p className={`text-[10px] font-extrabold uppercase tracking-widest ${mutedText}`}>
-                              Complaint Raised
+                            <p className={`text-[10px] font-bold uppercase tracking-wider ${mutedText}`}>
+                              Reported On
                             </p>
-                            <p className={`mt-2 text-sm font-bold ${heading}`}>
+                            <p className={`mt-2 text-xs font-bold ${heading}`}>
                               {formatDateTime(complaint.createdAt)}
                             </p>
                           </div>
 
-                          {/* RESOLUTION DEADLINE (READ-ONLY) */}
-                          <div className={`rounded-xl p-4 ${softBg}`}>
-                            <div className="flex items-center justify-between gap-1">
-                              <p className={`text-[10px] font-extrabold uppercase tracking-widest ${mutedText}`}>
-                                Deadline
+                          <div className={`rounded-xl border p-4 ${deadlineStyle(deadlineState)}`}>
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-[10px] font-bold uppercase tracking-wider">
+                                Resolution Deadline
                               </p>
-                              <span
-                                className={`rounded-full border px-2 py-0.5 text-[9px] font-extrabold ${getDeadlineBadgeStyle(
-                                  deadlineState
-                                )}`}
-                              >
+                              <span className="text-[9px] font-black">
                                 {deadlineState}
                               </span>
                             </div>
-                            <p className={`mt-2 text-xs font-bold ${heading}`}>
-                              {complaint.deadline ? formatDateTime(complaint.deadline) : "Not Set"}
+                            <p className="mt-2 text-xs font-black">
+                              {complaint.deadline
+                                ? formatDateTime(complaint.deadline)
+                                : "Not Assigned"}
                             </p>
-                            <p className={`mt-1 text-[11px] ${mutedText}`}>
-                              {getRemainingTime(complaint.deadline, complaint.status)}
+                            <p className="mt-1 text-[10px] font-semibold">
+                              {getRemainingTime(complaint)}
                             </p>
                           </div>
 
                           <div className={`rounded-xl p-4 ${softBg}`}>
                             <div className="flex items-center justify-between">
-                              <p className={`text-[10px] font-extrabold uppercase tracking-widest ${mutedText}`}>
+                              <p className={`text-[10px] font-bold uppercase tracking-wider ${mutedText}`}>
                                 Work Progress
                               </p>
                               <span className="text-xs font-black text-indigo-500">
                                 {progress}%
                               </span>
                             </div>
-
-                            <div
-                              className={`mt-3 h-2 overflow-hidden rounded-full ${
-                                darkMode ? "bg-slate-700" : "bg-slate-200"
-                              }`}
-                            >
+                            <div className={`mt-3 h-2 overflow-hidden rounded-full ${darkMode ? "bg-slate-700" : "bg-slate-200"}`}>
                               <div
                                 className={`h-full rounded-full transition-all duration-500 ${
-                                  complaint.status === "Resolved"
+                                  isResolved
                                     ? "bg-emerald-500"
-                                    : complaint.status === "In Progress"
-                                      ? "bg-violet-500"
-                                      : "bg-amber-500"
+                                    : isPending
+                                      ? "bg-amber-500"
+                                      : "bg-indigo-500"
                                 }`}
                                 style={{ width: `${progress}%` }}
                               />
                             </div>
+                            <p className={`mt-2 text-[10px] ${mutedText}`}>
+                              {isResolved ? "Completed" : isPending ? "Under review" : "Task progress"}
+                            </p>
                           </div>
                         </div>
 
-                        <div className="mt-4 flex justify-end">
+                        {/* PRIMARY ACTION */}
+                        <div className={`mt-5 flex flex-col justify-between gap-3 border-t pt-4 sm:flex-row sm:items-center ${borderLine}`}>
+                          <div className="flex flex-wrap items-center gap-2">
+                           {isAssigned && !isPending && (
+                              <button
+                                type="button"
+                                disabled={startingId === id}
+                                onClick={() => updateStatus(id, "In Progress")}
+                                className="rounded-xl bg-violet-600 px-5 py-3 text-xs font-black text-white shadow-md transition hover:bg-violet-700 disabled:opacity-50"
+                              >
+                                {startingId === id ? "Starting..." : "⚙ Start Work"}
+                              </button>
+                            )}
+
+                            {isInProgress && !isPending && !isResolved && (
+                              <span className="rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-3 text-xs font-bold text-violet-500">
+                                ⚙ Work In Progress
+                              </span>
+                            )}
+
+                            {isPending && (
+                              <span className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs font-bold text-amber-500">
+                                ◷ Awaiting Supervisor Verification
+                              </span>
+                            )}
+
+                            {isResolved && (
+                              <span className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-xs font-bold text-emerald-500">
+                                ✓ Verified & Resolved
+                              </span>
+                            )}
+
+                            {isRejected && (
+                              <span className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs font-bold text-red-500">
+                                ! Correction Required
+                              </span>
+                            )}
+                          </div>
+
                           <button
                             type="button"
-                            onClick={() => toggleComplaint(complaint._id)}
-                            className={`rounded-xl px-4 py-2.5 text-xs font-extrabold transition ${
-                              darkMode
-                                ? "bg-slate-700 text-indigo-300 hover:bg-slate-600"
-                                : "bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
-                            }`}
+                            onClick={() => toggleComplaint(id)}
+                            className={`rounded-xl border px-4 py-2.5 text-xs font-bold ${card} ${bodyText}`}
                           >
-                            {isExpanded ? "Hide Details ↑" : "View Details →"}
+                            {expanded ? "Hide Details ↑" : "View Full Details →"}
                           </button>
                         </div>
                       </div>
 
                       {/* EXPANDED DETAILS */}
-                      {isExpanded && (
+                      {expanded && (
                         <div className={`border-t ${borderLine}`}>
-                          {/* STUDENT INFORMATION */}
+                          {/* COMPLAINT DETAILS */}
                           <section className="p-5 sm:p-6">
-                            <div
-                              className={`rounded-2xl border p-5 ${
-                                darkMode
-                                  ? "border-indigo-900 bg-indigo-950/30"
-                                  : "border-indigo-100 bg-indigo-50/60"
-                              }`}
-                            >
-                              <div className="mb-5 flex items-center gap-3">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-lg text-white">
-                                  👨‍🎓
+                            <div className={`rounded-2xl border p-5 ${card}`}>
+                              <h4 className={`text-sm font-black ${heading}`}>
+                                Complaint Information
+                              </h4>
+
+                              <p className={`mt-3 text-sm leading-7 ${bodyText}`}>
+                                {complaint.description || "No description provided."}
+                              </p>
+
+                              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                                <div className={`rounded-xl p-3 ${softBg}`}>
+                                  <p className={`text-[10px] font-bold ${mutedText}`}>STUDENT</p>
+                                  <p className={`mt-1 text-xs font-bold ${heading}`}>
+                                    {complaint.user?.name || "Unknown"}
+                                  </p>
                                 </div>
-                                <div>
-                                  <h5 className={`font-extrabold ${heading}`}>
-                                    Student Information
-                                  </h5>
-                                  <p className={`text-xs ${mutedText}`}>
-                                    Details provided with the complaint
+                                <div className={`rounded-xl p-3 ${softBg}`}>
+                                  <p className={`text-[10px] font-bold ${mutedText}`}>EMAIL</p>
+                                  <p className={`mt-1 break-all text-xs font-bold ${heading}`}>
+                                    {complaint.user?.email || "Not available"}
+                                  </p>
+                                </div>
+                                <div className={`rounded-xl p-3 ${softBg}`}>
+                                  <p className={`text-[10px] font-bold ${mutedText}`}>LOCATION</p>
+                                  <p className={`mt-1 text-xs font-bold ${heading}`}>
+                                    {complaint.block || "N/A"} / Room {complaint.room || "N/A"}
                                   </p>
                                 </div>
                               </div>
-
-                              <div className="grid gap-3 sm:grid-cols-3">
-                                {[
-                                  {
-                                    label: "Student Name",
-                                    value: complaint.user?.name || "Unknown",
-                                  },
-                                  {
-                                    label: "Email Address",
-                                    value: complaint.user?.email || "Not available",
-                                  },
-                                  {
-                                    label: "Class / Section",
-                                    value: complaint.user?.classSection || "Not available",
-                                  },
-                                ].map((item) => (
-                                  <div
-                                    key={item.label}
-                                    className={`rounded-xl border p-4 ${
-                                      darkMode
-                                        ? "border-slate-700 bg-slate-900"
-                                        : "border-slate-200 bg-white"
-                                    }`}
-                                  >
-                                    <p className={`text-[10px] font-extrabold uppercase tracking-widest ${mutedText}`}>
-                                      {item.label}
-                                    </p>
-                                    <p className={`mt-2 break-words text-sm font-bold ${heading}`}>
-                                      {item.value}
-                                    </p>
-                                  </div>
-                                ))}
-                              </div>
                             </div>
                           </section>
 
-                          {/* DESCRIPTION */}
-                          <section className="px-5 pb-5 sm:px-6">
-                            <div className={`rounded-2xl border p-5 ${card}`}>
-                              <p className={`text-xs font-extrabold uppercase tracking-widest ${mutedText}`}>
-                                Problem Description
-                              </p>
-                              <p
-                                className={`mt-3 rounded-xl p-4 text-sm leading-7 ${
-                                  darkMode
-                                    ? "bg-slate-900 text-slate-300"
-                                    : "bg-slate-50 text-slate-700"
-                                }`}
-                              >
-                                {complaint.description ||
-                                  "No description provided."}
-                              </p>
-                            </div>
-                          </section>
-
-                          {/* TIMELINE */}
-                          <section className="px-5 pb-5 sm:px-6">
-                            <div className={`rounded-2xl border p-5 ${card}`}>
-                              <div className="mb-5">
-                                <h5 className={`font-extrabold ${heading}`}>
-                                  Complaint Timeline
-                                </h5>
-                                <p className={`mt-1 text-xs ${mutedText}`}>
-                                  Track the maintenance request journey.
-                                </p>
+                          {/* ORIGINAL PHOTO */}
+                          {complaint.image && (
+                            <section className="px-5 pb-5 sm:px-6">
+                              <div className={`rounded-2xl border p-5 ${card}`}>
+                                <h4 className={`text-xs font-black ${heading}`}>
+                                  Student's Problem Photo
+                                </h4>
+                                <img
+                                  src={complaint.image}
+                                  alt="Original complaint"
+                                  className="mt-4 max-h-80 w-full rounded-xl object-contain"
+                                />
                               </div>
+                            </section>
+                          )}
 
-                              <div className="grid gap-3 md:grid-cols-3">
+                          {/* WORK TIMELINE */}
+                          <section className="px-5 pb-5 sm:px-6">
+                            <div className={`rounded-2xl border p-5 ${card}`}>
+                              <h4 className={`text-sm font-black ${heading}`}>
+                                Maintenance Workflow
+                              </h4>
+                              <div className="mt-5 grid gap-3 md:grid-cols-4">
                                 {[
                                   {
                                     title: "Complaint Raised",
-                                    date: complaint.createdAt,
-                                    description: "Student submitted the request.",
-                                    icon: "✓",
-                                    color: "blue",
+                                    description: "Student reported the issue.",
                                     complete: true,
                                   },
                                   {
-                                    title: "Technician Assigned",
-                                    date: complaint.assignedAt,
-                                    description: "Request assigned to your account.",
-                                    icon: "2",
-                                    color: "amber",
-                                    complete: Boolean(complaint.assignedAt),
+                                    title: "Work Started",
+                                    description: "Technician began maintenance.",
+                                    complete: isInProgress || isPending || isResolved,
                                   },
                                   {
-                                    title: "Resolution",
-                                    date: complaint.resolvedAt,
-                                    description: "Maintenance issue resolved.",
-                                    icon: "3",
-                                    color: "emerald",
-                                    complete: Boolean(complaint.resolvedAt),
+                                    title: "Submitted",
+                                    description: "Photo and remarks submitted.",
+                                    complete: isPending || isRejected || isResolved,
                                   },
-                                ].map((step) => (
+                                  {
+                                    title: "Supervisor Approval",
+                                    description: "Work verified and closed.",
+                                    complete: isResolved,
+                                  },
+                                ].map((step, i) => (
                                   <div
                                     key={step.title}
                                     className={`rounded-xl border p-4 ${
-                                      darkMode
-                                        ? "border-slate-700 bg-slate-900"
-                                        : "border-slate-200 bg-slate-50"
+                                      step.complete
+                                        ? darkMode
+                                          ? "border-emerald-700/50 bg-emerald-950/20"
+                                          : "border-emerald-200 bg-emerald-50"
+                                        : card
                                     }`}
                                   >
-                                    <div className="flex items-center gap-3">
-                                      <div
-                                        className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-black ${
-                                          step.complete
-                                            ? step.color === "blue"
-                                              ? "bg-blue-100 text-blue-600"
-                                              : step.color === "amber"
-                                                ? "bg-amber-100 text-amber-600"
-                                                : "bg-emerald-100 text-emerald-600"
-                                            : darkMode
-                                              ? "bg-slate-700 text-slate-400"
-                                              : "bg-slate-200 text-slate-500"
-                                        }`}
-                                      >
-                                        {step.complete ? "✓" : step.icon}
-                                      </div>
-                                      <p className={`text-sm font-bold ${heading}`}>
-                                        {step.title}
-                                      </p>
+                                    <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-black ${
+                                      step.complete
+                                        ? "bg-emerald-500 text-white"
+                                        : darkMode
+                                          ? "bg-slate-700 text-slate-300"
+                                          : "bg-slate-100 text-slate-500"
+                                    }`}>
+                                      {step.complete ? "✓" : `0${i + 1}`}
                                     </div>
-
-                                    <p className={`mt-3 text-xs leading-5 ${mutedText}`}>
-                                      {step.description}
+                                    <p className={`mt-3 text-xs font-black ${heading}`}>
+                                      {step.title}
                                     </p>
-
-                                    <p className="mt-2 text-xs font-bold text-indigo-500">
-                                      {step.date
-                                        ? formatDateTime(step.date)
-                                        : "Waiting for update"}
+                                    <p className={`mt-1 text-[10px] leading-5 ${mutedText}`}>
+                                      {step.description}
                                     </p>
                                   </div>
                                 ))}
@@ -1372,324 +1355,258 @@ function TechnicianDashboard() {
                             </div>
                           </section>
 
-                          {/* PHOTOS & COMPLETION VERIFICATION */}
-                          <section className="grid gap-4 px-5 pb-5 sm:px-6 lg:grid-cols-2">
-                            {complaint.image && (
-                              <div className={`rounded-2xl border p-5 ${card}`}>
-                                <p className={`text-xs font-extrabold uppercase tracking-widest ${mutedText}`}>
-                                  Problem Photo
+                          {/* COMPLETION PANEL */}
+                          <section className="px-5 pb-5 sm:px-6">
+                            <div className={`overflow-hidden rounded-2xl border ${card}`}>
+                              <div className="bg-gradient-to-r from-indigo-700 to-violet-700 p-5 text-white">
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-100">
+                                  Work Completion & Verification
                                 </p>
-                                <p className={`mt-1 text-xs ${mutedText}`}>
-                                  Image uploaded by the student
+                                <h4 className="mt-1 text-lg font-black">
+                                  Maintenance Evidence
+                                </h4>
+                                <p className="mt-1 text-xs text-indigo-100">
+                                  Submit work remarks and a completion photo for supervisor review.
                                 </p>
-
-                                <img
-                                  src={complaint.image}
-                                  alt="Reported maintenance problem"
-                                  className="mt-4 h-64 w-full rounded-xl object-cover"
-                                />
-                              </div>
-                            )}
-
-                            {/* COMPLETION SUBMISSION & VERIFICATION STATUS */}
-                            <div className={`rounded-2xl border p-5 ${card}`}>
-                              <div className="flex flex-wrap items-center justify-between gap-2">
-                                <div>
-                                  <p className={`text-xs font-extrabold uppercase tracking-widest ${mutedText}`}>
-                                    Completion Details
-                                  </p>
-                                  <p className={`mt-1 text-xs ${mutedText}`}>
-                                    Proof of work & supervisor verification
-                                  </p>
-                                </div>
-
-                                <span
-                                  className={`rounded-full border px-3 py-1 text-[10px] font-extrabold ${
-                                    complaint.verificationStatus === "Approved" || complaint.status === "Resolved"
-                                      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-500"
-                                      : complaint.verificationStatus === "Rejected"
-                                        ? "border-red-500/30 bg-red-500/10 text-red-500"
-                                        : complaint.verificationStatus === "Pending"
-                                          ? "border-amber-500/30 bg-amber-500/10 text-amber-500"
-                                          : "border-slate-500/30 bg-slate-500/10 text-slate-500"
-                                  }`}
-                                >
-                                  {complaint.verificationStatus === "Approved" || complaint.status === "Resolved"
-                                    ? "✓ Approved"
-                                    : complaint.verificationStatus === "Rejected"
-                                      ? "⚠️ Rejected"
-                                      : complaint.verificationStatus === "Pending"
-                                        ? "⏳ Awaiting Approval"
-                                        : "Not Submitted"}
-                                </span>
                               </div>
 
-                              {/* REJECTION ALERT BANNER */}
-                              {complaint.verificationStatus === "Rejected" && complaint.verificationRemarks && (
-                                <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3.5">
-                                  <p className="text-xs font-bold text-red-500">
-                                    ⚠️ Supervisor Requested Corrections:
-                                  </p>
-                                  <p className="mt-1 text-xs text-red-400">
-                                    {complaint.verificationRemarks}
-                                  </p>
-                                  <p className="mt-2 text-[11px] text-slate-400">
-                                    Please fix the issue, update your remarks below, and upload a new completion photo.
-                                  </p>
-                                </div>
-                              )}
+                              <div className="p-5">
+                                {/* PENDING */}
+                                {isPending && (
+                                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+                                    <p className="text-sm font-black text-amber-500">
+                                      ◷ Submission Sent for Verification
+                                    </p>
+                                    <p className={`mt-2 text-xs leading-6 ${bodyText}`}>
+                                      Your completion details have been submitted successfully. The supervisor must review and approve the work before this complaint becomes Resolved.
+                                    </p>
+                                  </div>
+                                )}
 
-                              {/* PENDING VERIFICATION BANNER */}
-                              {complaint.verificationStatus === "Pending" && (
-                                <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5">
-                                  <p className="text-xs font-bold text-amber-500">
-                                    ⏳ Submitted for Supervisor Verification
-                                  </p>
-                                  <p className="mt-1 text-xs text-amber-400">
-                                    Your completion photo and remarks have been sent to the supervisor. The complaint will be marked as Resolved upon supervisor approval.
-                                  </p>
-                                </div>
-                              )}
+                                {/* REJECTED */}
+                                {isRejected && (
+                                  <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4">
+                                    <p className="text-sm font-black text-red-500">
+                                      Correction Required by Supervisor
+                                    </p>
+                                    <p className="mt-2 text-xs leading-6 text-red-400">
+                                      {complaint.verificationRemarks || "Please correct the submitted work."}
+                                    </p>
+                                    <p className="mt-2 text-[10px] font-semibold text-red-400">
+                                      Update your remarks and upload a new completion photo below.
+                                    </p>
+                                  </div>
+                                )}
 
-                              {/* RESOLVED BANNER */}
-                              {complaint.status === "Resolved" && (
-                                <div className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5">
-                                  <p className="text-xs font-bold text-emerald-500">
-                                    ✓ Work Verified and Closed
-                                  </p>
-                                  <p className="mt-1 text-xs text-emerald-400">
-                                    Supervisor has approved your completion. This complaint is resolved.
-                                  </p>
-                                </div>
-                              )}
+                                {/* APPROVED */}
+                                {isResolved && (
+                                  <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
+                                    <p className="text-sm font-black text-emerald-500">
+                                      ✓ Work Approved by Supervisor
+                                    </p>
+                                    <p className={`mt-2 text-xs ${bodyText}`}>
+                                      This maintenance request has been verified and marked as Resolved.
+                                    </p>
+                                    {complaint.verificationRemarks && (
+                                      <p className={`mt-3 text-xs ${bodyText}`}>
+                                        Supervisor remarks: {complaint.verificationRemarks}
+                                      </p>
+                                    )}
+                                    <p className={`mt-2 text-[10px] ${mutedText}`}>
+                                      Verified on: {formatDateTime(complaint.verifiedAt)}
+                                    </p>
+                                  </div>
+                                )}
 
-                              {/* CURRENT OR PREVIOUS COMPLETION PHOTO */}
-                              {complaint.completionImage && (
-                                <div className="mt-4">
-                                  <p className={`text-[10px] font-bold uppercase tracking-wider ${mutedText}`}>
-                                    Submitted Completion Photo:
-                                  </p>
-                                  <img
-                                    src={complaint.completionImage}
-                                    alt="Completed maintenance work"
-                                    className="mt-2 h-56 w-full rounded-xl object-cover"
-                                  />
-                                </div>
-                              )}
+                                {/* PREVIOUS COMPLETION PHOTO */}
+                                {complaint.completionImage && (
+                                  <div className="mt-5">
+                                    <p className={`text-xs font-bold ${heading}`}>
+                                      {isRejected ? "Previously Submitted Photo" : "Completion Photo"}
+                                    </p>
+                                    <img
+                                      src={complaint.completionImage}
+                                      alt="Maintenance completion"
+                                      className="mt-3 max-h-80 w-full rounded-xl object-contain"
+                                    />
+                                  </div>
+                                )}
 
-                              {/* CURRENT RESOLUTION REMARKS DISPLAY */}
-                              {complaint.resolutionRemarks && complaint.verificationStatus !== "Rejected" && (
-                                <div className="mt-3">
-                                  <p className={`text-[10px] font-bold uppercase tracking-wider ${mutedText}`}>
-                                    Resolution Remarks:
-                                  </p>
-                                  <p className={`mt-1 text-xs leading-5 ${heading}`}>
-                                    {complaint.resolutionRemarks}
-                                  </p>
-                                </div>
-                              )}
+                                {/* PREVIOUS REMARKS */}
+                                {complaint.resolutionRemarks && (
+                                  <div className={`mt-4 rounded-xl p-4 ${softBg}`}>
+                                    <p className={`text-[10px] font-bold uppercase tracking-wider ${mutedText}`}>
+                                      {isRejected ? "Previous Work Remarks" : "Resolution Remarks"}
+                                    </p>
+                                    <p className={`mt-2 text-xs leading-6 ${bodyText}`}>
+                                      {complaint.resolutionRemarks}
+                                    </p>
+                                  </div>
+                                )}
 
-                              {/* SUBMISSION FORM (ALLOWED IF IN PROGRESS OR REJECTED) */}
-                              {complaint.status !== "Resolved" && complaint.verificationStatus !== "Pending" && (
-                                <div className="mt-4 border-t border-slate-700/40 pt-4">
-                                  <label className={`block text-xs font-bold ${heading}`}>
-                                    Resolution Remarks <span className="text-red-500">*</span>
-                                  </label>
-                                  <textarea
-                                    rows="2"
-                                    value={
-                                      resolutionRemarks[complaint._id] ??
-                                      complaint.resolutionRemarks ??
-                                      ""
-                                    }
-                                    onChange={(e) =>
-                                      setResolutionRemarks((prev) => ({
-                                        ...prev,
-                                        [complaint._id]: e.target.value,
-                                      }))
-                                    }
-                                    placeholder="Describe the maintenance / replacement work done..."
-                                    className={`mt-1.5 w-full rounded-xl border p-3 text-xs outline-none transition ${
-                                      darkMode
-                                        ? "border-slate-700 bg-slate-900 text-white placeholder:text-slate-500 focus:border-indigo-500"
-                                        : "border-slate-300 bg-white text-slate-800 placeholder:text-slate-400 focus:border-indigo-500"
-                                    }`}
-                                  />
+                                {/* SUBMISSION FORM: ONLY AFTER START WORK */}
+                                {isInProgress && !isPending && !isResolved && (
+                                  <div className="mt-5 border-t pt-5">
+                                    <div className="mb-4">
+                                      <h5 className={`text-sm font-black ${heading}`}>
+                                        {isRejected ? "Resubmit Corrected Work" : "Submit Completed Work"}
+                                      </h5>
+                                      <p className={`mt-1 text-xs ${mutedText}`}>
+                                        Fill in the details below and send them for supervisor verification.
+                                      </p>
+                                    </div>
 
-                                  <div className="mt-3">
                                     <label className={`block text-xs font-bold ${heading}`}>
-                                      Completion Photo <span className="text-red-500">*</span>
+                                      Resolution Remarks <span className="text-red-500">*</span>
                                     </label>
 
-                                    {selectedFiles[complaint._id] ? (
-                                      <div className="mt-2 flex items-center justify-between rounded-xl border border-indigo-500/40 bg-indigo-500/10 p-3">
-                                        <div className="flex items-center gap-2 truncate">
-                                          <span className="text-lg">📷</span>
-                                          <span className="truncate text-xs font-semibold text-indigo-400">
-                                            {selectedFiles[complaint._id].name}
-                                          </span>
-                                        </div>
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            setSelectedFiles((prev) => ({
-                                              ...prev,
-                                              [complaint._id]: null,
-                                            }))
-                                          }
-                                          className="text-xs font-bold text-red-400 hover:text-red-300"
-                                        >
-                                          Remove
-                                        </button>
-                                      </div>
-                                    ) : (
-                                      <label
-                                        className={`mt-2 flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-5 text-center transition ${
-                                          darkMode
-                                            ? "border-slate-600 bg-slate-900/60 hover:border-indigo-500 hover:bg-indigo-950/20"
-                                            : "border-slate-300 bg-slate-50 hover:border-indigo-400 hover:bg-indigo-50"
-                                        }`}
-                                      >
-                                        <span className="text-2xl">📸</span>
-                                        <span className={`mt-2 text-xs font-bold ${heading}`}>
-                                          {complaint.completionImage ? "Upload New Photo" : "Select Completion Photo"}
+                                    <textarea
+                                      rows={4}
+                                      value={
+                                        resolutionRemarks[id] ??
+                                        (isRejected ? "" : complaint.resolutionRemarks || "")
+                                      }
+                                      onChange={(e) =>
+                                        setResolutionRemarks((prev) => ({
+                                          ...prev,
+                                          [id]: e.target.value,
+                                        }))
+                                      }
+                                      placeholder="Describe the repair, replacement or maintenance work completed..."
+                                      className={`mt-2 w-full resize-y rounded-xl border p-4 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 ${inputStyle}`}
+                                    />
+
+                                    <div className="mt-5">
+                                      <p className={`text-xs font-bold ${heading}`}>
+                                        Completion Photo <span className="text-red-500">*</span>
+                                      </p>
+                                      <p className={`mt-1 text-[10px] ${mutedText}`}>
+                                        Upload clear evidence of the completed maintenance work. Maximum 5 MB.
+                                      </p>
+
+                                      <label className={`mt-3 flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-7 text-center transition ${
+                                        darkMode
+                                          ? "border-slate-600 bg-slate-950 hover:border-indigo-500"
+                                          : "border-slate-300 bg-slate-50 hover:border-indigo-400 hover:bg-indigo-50/50"
+                                      }`}>
+                                        <span className="text-3xl">📷</span>
+                                        <span className={`mt-3 text-sm font-bold ${heading}`}>
+                                          {selectedFiles[id]
+                                            ? "Photo selected"
+                                            : "Choose completion photo"}
                                         </span>
-                                        <span className={`mt-0.5 text-[10px] ${mutedText}`}>
-                                          JPG, PNG or WEBP
+                                        <span className={`mt-1 text-[10px] ${mutedText}`}>
+                                          JPG · PNG · WEBP
                                         </span>
+
                                         <input
                                           type="file"
-                                          accept="image/png,image/jpeg,image/webp"
+                                          accept="image/jpeg,image/png,image/webp"
                                           className="hidden"
-                                          disabled={uploadingId === complaint._id}
+                                          disabled={uploadingId === id}
                                           onChange={(e) => {
                                             const file = e.target.files?.[0];
+
                                             if (file) {
-                                              setSelectedFiles((prev) => ({
-                                                ...prev,
-                                                [complaint._id]: file,
-                                              }));
+                                              if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+                                                alert("Only JPG, PNG and WEBP images are allowed.");
+                                              } else if (file.size > 5 * 1024 * 1024) {
+                                                alert("Image must be smaller than 5 MB.");
+                                              } else {
+                                                setSelectedFiles((prev) => ({
+                                                  ...prev,
+                                                  [id]: file,
+                                                }));
+                                              }
                                             }
+
                                             e.target.value = "";
                                           }}
                                         />
                                       </label>
-                                    )}
-                                  </div>
 
-                                  <button
-                                    type="button"
-                                    disabled={
-                                      uploadingId === complaint._id ||
-                                      !(
-                                        resolutionRemarks[complaint._id]?.trim() ||
-                                        complaint.resolutionRemarks?.trim()
-                                      ) ||
-                                      (!selectedFiles[complaint._id] && !complaint.completionImage)
-                                    }
-                                    onClick={() => handleCompletionSubmit(complaint._id)}
-                                    className="mt-4 w-full rounded-xl bg-indigo-600 px-4 py-3 text-xs font-black text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-500"
-                                  >
-                                    {uploadingId === complaint._id
-                                      ? "Submitting Completion..."
-                                      : "Submit for Supervisor Verification"}
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          </section>
-
-                          {/* WORK ACTIONS */}
-                          <section
-                            className={`border-t p-5 sm:p-6 ${borderLine} ${
-                              darkMode ? "bg-slate-800/60" : "bg-slate-50"
-                            }`}
-                          >
-                            <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-                              <div>
-                                <h5 className={`font-extrabold ${heading}`}>
-                                  Work Status & Actions
-                                </h5>
-                                <p className={`mt-1 text-xs ${mutedText}`}>
-                                  Supervisor approval is required to mark complaints as Resolved.
-                                </p>
-                              </div>
-
-                              <div className="flex flex-wrap items-center gap-2">
-                                {complaint.status === "Assigned" && (
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      updateStatus(
-                                        complaint._id,
-                                        "In Progress"
-                                      )
-                                    }
-                                    className="rounded-xl bg-violet-600 px-5 py-3 text-sm font-extrabold text-white transition hover:bg-violet-700"
-                                  >
-                                    ⚙ Start Work
-                                  </button>
-                                )}
-
-                                {complaint.status === "In Progress" && (
-                                  <span
-                                    className={`rounded-xl border px-4 py-2.5 text-xs font-extrabold ${
-                                      complaint.verificationStatus === "Pending"
-                                        ? "border-amber-500/30 bg-amber-500/10 text-amber-500"
-                                        : "border-violet-500/30 bg-violet-500/10 text-violet-400"
-                                    }`}
-                                  >
-                                    {complaint.verificationStatus === "Pending"
-                                      ? "⏳ Awaiting Supervisor Verification"
-                                      : "⚙ In Progress"}
-                                  </span>
-                                )}
-
-                                {complaint.status === "Resolved" && (
-                                  <>
-                                    <span className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-extrabold text-emerald-700">
-                                      ✓ Resolved by Supervisor
-                                    </span>
+                                      {selectedFiles[id] && (
+                                        <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-indigo-500/30 bg-indigo-500/10 p-3">
+                                          <p className="truncate text-xs font-bold text-indigo-500">
+                                            📎 {selectedFiles[id].name}
+                                          </p>
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              setSelectedFiles((prev) => ({
+                                                ...prev,
+                                                [id]: null,
+                                              }))
+                                            }
+                                            className="shrink-0 text-xs font-bold text-red-500"
+                                          >
+                                            Remove
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
 
                                     <button
                                       type="button"
-                                      onClick={() =>
-                                        deleteComplaint(complaint._id)
+                                      disabled={
+                                        uploadingId === id ||
+                                        !(resolutionRemarks[id] ??
+                                          (isRejected ? "" : complaint.resolutionRemarks || "")
+                                        ).trim() ||
+                                        (!selectedFiles[id] && !complaint.completionImage)
                                       }
-                                      className="rounded-xl border border-red-200 bg-white px-4 py-3 text-sm font-extrabold text-red-600 transition hover:bg-red-50"
+                                      onClick={() => handleCompletionSubmit(id)}
+                                      className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-4 text-sm font-black text-white shadow-lg shadow-indigo-600/15 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-500 disabled:shadow-none"
                                     >
-                                      🗑 Delete
+                                      {uploadingId === id
+                                        ? "Uploading & Submitting..."
+                                        : isRejected
+                                          ? "↻ Resubmit for Verification"
+                                          : "✓ Done — Submit for Supervisor Verification"}
                                     </button>
-                                  </>
+                                  </div>
+                                )}
+
+                                {/* ASSIGNED: START FIRST */}
+                                {isAssigned && (
+                                  <div className={`mt-4 rounded-xl border p-4 ${
+                                    darkMode
+                                      ? "border-violet-500/20 bg-violet-500/5"
+                                      : "border-violet-200 bg-violet-50"
+                                  }`}>
+                                    <p className={`text-xs font-bold ${heading}`}>
+                                      Work has not started yet.
+                                    </p>
+                                    <p className={`mt-1 text-xs ${mutedText}`}>
+                                      Click Start Work first. The completion photo and remarks form will become available after that.
+                                    </p>
+                                  </div>
                                 )}
                               </div>
                             </div>
-
-                            {complaint.status === "In Progress" &&
-                              complaint.verificationStatus !== "Pending" && (
-                                <p
-                                  className={`mt-4 rounded-xl px-4 py-3 text-xs font-semibold ${
-                                    darkMode
-                                      ? "bg-indigo-950/50 text-indigo-300"
-                                      : "bg-indigo-50 text-indigo-700"
-                                  }`}
-                                >
-                                  Note: When your maintenance work is finished, enter resolution remarks and upload a completion photo above to submit for supervisor approval.
-                                </p>
-                              )}
                           </section>
 
-                          <div className={`border-t p-4 ${borderLine}`}>
+                          {/* DELETE RESOLVED */}
+                          {isResolved && (
+                            <div className={`flex justify-end border-t p-5 ${borderLine}`}>
+                              <button
+                                type="button"
+                                disabled={deletingId === id}
+                                onClick={() => deleteComplaint(id)}
+                                className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-xs font-bold text-red-500 hover:bg-red-500/20 disabled:opacity-50"
+                              >
+                                {deletingId === id ? "Deleting..." : "Delete Resolved Complaint"}
+                              </button>
+                            </div>
+                          )}
+
+                          <div className={`border-t p-3 ${borderLine}`}>
                             <button
                               type="button"
-                              onClick={() => toggleComplaint(complaint._id)}
-                              className={`w-full rounded-xl px-4 py-3 text-sm font-extrabold transition ${
-                                darkMode
-                                  ? "bg-slate-800 text-slate-300 hover:bg-slate-700"
-                                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                              }`}
+                              onClick={() => toggleComplaint(id)}
+                              className={`w-full rounded-xl py-2.5 text-xs font-bold ${softBg} ${bodyText}`}
                             >
-                              Show Less ↑
+                              Close Details ↑
                             </button>
                           </div>
                         </div>
@@ -1701,222 +1618,86 @@ function TechnicianDashboard() {
             )}
           </section>
 
-          {/* QUICK ACTIONS */}
-          <section className={`rounded-3xl border p-6 shadow-sm ${panel}`}>
-            <div className="mb-5">
-              <p
-                className={`text-xs font-bold uppercase tracking-widest ${mutedText}`}
-              >
-                WORK SHORTCUTS
+          {/* WORK GUIDELINES */}
+          <section className={`rounded-3xl border p-6 ${panel}`}>
+            <div>
+              <p className={`text-[10px] font-bold uppercase tracking-widest ${mutedText}`}>
+                Standard Operating Process
               </p>
               <h2 className={`mt-1 text-xl font-black ${heading}`}>
-                Quick Actions
+                How to Complete a Task
               </h2>
-              <p className={`mt-1 text-sm ${mutedText}`}>
-                Quickly access the most important parts of your workspace.
+              <p className={`mt-1 text-xs ${mutedText}`}>
+                Follow the official maintenance and verification workflow.
               </p>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="mt-6 grid gap-4 md:grid-cols-4">
               {[
                 {
-                  icon: "📋",
-                  title: "All Assigned Tasks",
-                  description: "Review all maintenance requests assigned to you.",
-                  filter: "All",
+                  number: "01",
+                  title: "Review Assignment",
+                  text: "Check the complaint, location, priority and deadline.",
+                  icon: "▤",
                 },
                 {
-                  icon: "🔧",
-                  title: "Continue Active Work",
-                  description: "Focus on maintenance tasks currently in progress.",
-                  filter: "In Progress",
+                  number: "02",
+                  title: "Start Work",
+                  text: "Click Start Work and begin maintenance.",
+                  icon: "⚙",
                 },
                 {
-                  icon: "✅",
-                  title: "Completed Tasks",
-                  description: "Review your successfully resolved requests.",
-                  filter: "Resolved",
-                },
-              ].map((action) => (
-                <button
-                  key={action.title}
-                  type="button"
-                  onClick={() => {
-                    setStatusFilter(action.filter);
-                    setPriorityFilter("All");
-                    setSearchTerm("");
-                    setShowAllComplaints(true);
-
-                    document
-                      .getElementById("assigned-work")
-                      ?.scrollIntoView({ behavior: "smooth" });
-                  }}
-                  className={`group rounded-2xl border p-5 text-left transition duration-200 hover:-translate-y-1 hover:shadow-lg ${
-                    darkMode
-                      ? "border-slate-700 bg-slate-800 hover:border-indigo-500"
-                      : "border-slate-200 bg-slate-50 hover:border-indigo-200 hover:bg-indigo-50"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-100 text-2xl">
-                      {action.icon}
-                    </div>
-                    <span className={`text-lg transition group-hover:translate-x-1 ${mutedText}`}>
-                      →
-                    </span>
-                  </div>
-
-                  <h3 className={`mt-4 text-sm font-black ${heading}`}>
-                    {action.title}
-                  </h3>
-
-                  <p className={`mt-1 text-xs leading-5 ${mutedText}`}>
-                    {action.description}
-                  </p>
-                </button>
-              ))}
-            </div>
-          </section>
-
-          {/* WORKFLOW */}
-          <section className={`rounded-3xl border p-6 shadow-sm ${panel}`}>
-            <div className="mb-6">
-              <p
-                className={`text-xs font-bold uppercase tracking-widest ${mutedText}`}
-              >
-                MAINTENANCE PROCESS
-              </p>
-              <h2 className={`mt-1 text-xl font-black ${heading}`}>
-                Your Work Journey
-              </h2>
-              <p className={`mt-1 text-sm ${mutedText}`}>
-                Follow these steps to complete a maintenance request.
-              </p>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-3">
-              {[
-                {
-                  step: "01",
-                  icon: "📥",
-                  title: "Receive Assignment",
-                  description:
-                    "Review the complaint details and understand the reported issue.",
+                  number: "03",
+                  title: "Submit Evidence",
+                  text: "Add resolution remarks and upload the completion photo.",
+                  icon: "▧",
                 },
                 {
-                  step: "02",
-                  icon: "🔧",
-                  title: "Perform Maintenance",
-                  description:
-                    "Start the work, address the issue and upload completion proof.",
-                },
-                {
-                  step: "03",
-                  icon: "✅",
-                  title: "Complete the Task",
-                  description:
-                    "Update the complaint status after successful maintenance.",
+                  number: "04",
+                  title: "Supervisor Review",
+                  text: "Wait for verification. Approval marks the task Resolved.",
+                  icon: "✓",
                 },
               ].map((step) => (
-                <div
-                  key={step.step}
-                  className={`rounded-2xl border p-5 ${
-                    darkMode
-                      ? "border-slate-700 bg-slate-800"
-                      : "border-slate-200 bg-slate-50"
-                  }`}
-                >
+                <div key={step.number} className={`rounded-2xl border p-5 ${card}`}>
                   <div className="flex items-center justify-between">
-                    <div
-                      className={`flex h-12 w-12 items-center justify-center rounded-xl text-2xl ${
-                        darkMode ? "bg-slate-700" : "bg-white"
-                      }`}
-                    >
+                    <span className="text-2xl font-black text-indigo-500">
+                      {step.number}
+                    </span>
+                    <span className={`flex h-10 w-10 items-center justify-center rounded-xl text-xl ${softBg}`}>
                       {step.icon}
-                    </div>
-                    <span className={`text-xs font-black ${mutedText}`}>
-                      STEP {step.step}
                     </span>
                   </div>
-
                   <h3 className={`mt-4 text-sm font-black ${heading}`}>
                     {step.title}
                   </h3>
-
-                  <p className={`mt-2 text-xs leading-6 ${bodyText}`}>
-                    {step.description}
+                  <p className={`mt-2 text-xs leading-6 ${mutedText}`}>
+                    {step.text}
                   </p>
                 </div>
               ))}
             </div>
           </section>
 
-          {/* RESPONSIBILITY NOTICE */}
-          <section
-            className={`rounded-2xl border p-5 ${
-              darkMode
-                ? "border-blue-900 bg-blue-950/30"
-                : "border-blue-200 bg-blue-50"
-            }`}
-          >
-            <div className="flex gap-4">
-              <div
-                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl ${
-                  darkMode ? "bg-blue-900/60" : "bg-white"
-                }`}
-              >
-                🔒
-              </div>
-
-              <div>
-                <h3
-                  className={`text-sm font-black ${
-                    darkMode ? "text-blue-300" : "text-blue-900"
-                  }`}
-                >
-                  Technician Workspace & Responsibilities
-                </h3>
-
-                <p
-                  className={`mt-1 text-sm leading-6 ${
-                    darkMode ? "text-blue-200" : "text-blue-800"
-                  }`}
-                >
-                  This workspace displays complaints assigned to your
-                  technician account. Keep task statuses updated and provide
-                  completion photo evidence before resolving maintenance
-                  requests.
-                </p>
-              </div>
-            </div>
-          </section>
-
           {/* FOOTER */}
-          <footer
-            className={`border-t pt-6 pb-2 ${
-              darkMode ? "border-slate-800" : "border-slate-200"
-            }`}
-          >
-            <div className="flex flex-col items-center justify-between gap-2 text-center sm:flex-row sm:text-left">
+          <footer className={`border-t pt-6 ${borderLine}`}>
+            <div className="flex flex-col items-center justify-between gap-3 text-center sm:flex-row sm:text-left">
               <div>
                 <p className={`text-sm font-black ${heading}`}>
                   CampusFix
                 </p>
-                <p className={`mt-1 text-xs ${mutedText}`}>
-                  Medi-Caps University
+                <p className={`mt-1 text-[10px] ${mutedText}`}>
+                  Medi-Caps University · Maintenance Operations
                 </p>
               </div>
-
-              <div className={`text-xs ${mutedText}`}>
-                <p>Smart Campus • Faster Resolution • Better Management</p>
-                <p className="mt-1">© 2026 Medi-Caps University</p>
-              </div>
+              <p className={`text-[10px] ${mutedText}`}>
+                Smart Campus · Efficient Maintenance · Verified Resolution
+              </p>
             </div>
           </footer>
         </div>
       </main>
 
-      {/* LOGOUT MODAL */}
       <LogoutModal
         isOpen={showLogout}
         onClose={() => setShowLogout(false)}

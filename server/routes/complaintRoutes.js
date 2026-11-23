@@ -9,6 +9,7 @@ const {
   getAssignedComplaints,
   updateComplaintStatus,
   assignComplaint,
+  updateComplaintDeadline,
   deleteComplaint,
   uploadCompletionPhoto,
   submitFeedback,
@@ -67,6 +68,14 @@ router.get(
   protect,
   allowRoles("admin"),
   getAllComplaints
+);
+
+// Update complaint deadline - Admin only
+router.patch(
+  "/:id/deadline",
+  protect,
+  allowRoles("admin"),
+  updateComplaintDeadline
 );
 
 // Get assigned complaints - Technician

@@ -344,11 +344,12 @@ const getAllComplaints = async (req, res) => {
 // =====================================================
 
 
+
 const updateComplaintStatus = async (req, res) => {
   try {
     const { status } = req.body;
 
-    // Technician cannot directly resolve a complaint.
+    // Technician can only set these statuses.
     const allowedStatuses = ["Assigned", "In Progress"];
 
     if (!allowedStatuses.includes(status)) {
@@ -370,18 +371,40 @@ const updateComplaintStatus = async (req, res) => {
       });
     }
 
-    if (complaint.verificationStatus === "Pending") {
+    // Prevent changes after resolution.
+    if (complaint.status === "Resolved") {
       return res.status(400).json({
-        message: "Your completion submission is awaiting supervisor verification.",
+        message: "This complaint has already been resolved.",
       });
     }
 
+    // Prevent changes while supervisor verification is pending.
+    if (complaint.verificationStatus === "Pending") {
+      return res.status(400).json({
+        message:
+          "Your completion submission is awaiting supervisor verification.",
+      });
+    }
+
+    // Prevent changes after supervisor approval.
     if (complaint.verificationStatus === "Approved") {
       return res.status(400).json({
         message: "This complaint has already been approved.",
       });
     }
 
+    // Prevent moving back from In Progress to Assigned.
+    if (
+      complaint.status === "In Progress" &&
+      status === "Assigned"
+    ) {
+      return res.status(400).json({
+        message:
+          "Work has already started. Status cannot be changed back to Assigned.",
+      });
+    }
+
+    // Update status.
     complaint.status = status;
 
     complaint.auditHistory.push({
@@ -393,7 +416,7 @@ const updateComplaintStatus = async (req, res) => {
 
     await complaint.save();
 
-    return res.json({
+    return res.status(200).json({
       message: "Complaint status updated successfully.",
       complaint,
     });
@@ -428,11 +451,19 @@ const updateComplaintStatus = async (req, res) => {
 
 const assignComplaint = async (req, res) => {
   try {
-    const { supervisorId } = req.body;
+    const { supervisorId, deadlineHours } = req.body;
 
     if (!supervisorId) {
       return res.status(400).json({
         message: "Please select a supervisor",
+      });
+    }
+
+    const hours = Number(deadlineHours);
+
+    if (!Number.isFinite(hours) || hours <= 0) {
+      return res.status(400).json({
+        message: "Please select a valid deadline in hours.",
       });
     }
 
@@ -473,6 +504,17 @@ const assignComplaint = async (req, res) => {
       });
     }
 
+    // Prevent duplicate assignment to the same supervisor
+    if (
+      existingComplaint.supervisor &&
+      existingComplaint.supervisor.toString() === supervisorId &&
+      existingComplaint.status === "Assigned"
+    ) {
+      return res.status(400).json({
+        message: "This complaint is already assigned to this supervisor.",
+      });
+    }
+
     // Find the selected supervisor
     const supervisor = await User.findOne({
       _id: supervisorId,
@@ -506,11 +548,49 @@ const assignComplaint = async (req, res) => {
     }
 
     // Assign complaint
+    // Assign complaint and set Admin-controlled deadline
+    const assignedAt = new Date();
+
+    const previousDeadline = existingComplaint.deadline || null;
+
+    const newDeadline = new Date(
+      assignedAt.getTime() + hours * 60 * 60 * 1000
+    );
+
+    const deadlineReason =
+      `Admin assigned a ${hours}-hour resolution deadline.`;
+
+    // Assign supervisor
     existingComplaint.supervisor = supervisor._id;
     existingComplaint.technician = null;
     existingComplaint.status = "Assigned";
-    existingComplaint.assignedAt = new Date();
+    existingComplaint.assignedAt = assignedAt;
     existingComplaint.technicianAssignedAt = null;
+
+    // Save deadline
+    existingComplaint.deadlineHistory.push({
+      previousDeadline,
+      newDeadline,
+      reason: deadlineReason,
+      changedBy: admin._id,
+      changedAt: assignedAt,
+    });
+
+    existingComplaint.deadline = newDeadline;
+    existingComplaint.deadlineSetBy = admin._id;
+    existingComplaint.deadlineReason = deadlineReason;
+    existingComplaint.deadlineVersion =
+      (existingComplaint.deadlineVersion || 0) + 1;
+
+    // Audit history
+    existingComplaint.auditHistory.push({
+      action: previousDeadline
+        ? "DEADLINE_UPDATED"
+        : "DEADLINE_SET",
+      details: `Admin assigned a ${hours}-hour deadline. Deadline: ${newDeadline.toISOString()}`,
+      performedBy: admin._id,
+      performedAt: assignedAt,
+    });
 
     await existingComplaint.save();
 
@@ -518,8 +598,7 @@ const assignComplaint = async (req, res) => {
     await createNotification({
       recipient: supervisor._id,
       title: "New Complaint Assigned",
-      message: `A ${existingComplaint.category} complaint from ${existingComplaint.block}, Room ${existingComplaint.room} has been assigned to you.`,
-      type: "supervisor_assigned",
+      message: `A ${existingComplaint.category} complaint from ${existingComplaint.block}, Room ${existingComplaint.room} has been assigned to you. Resolution deadline: ${newDeadline.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}.`, type: "supervisor_assigned",
       complaint: existingComplaint._id,
     });
 
@@ -544,6 +623,11 @@ const assignComplaint = async (req, res) => {
         technician: null,
         createdAt: existingComplaint.createdAt,
         assignedAt: existingComplaint.assignedAt,
+        deadline: existingComplaint.deadline,
+        deadlineSetBy: existingComplaint.deadlineSetBy,
+        deadlineReason: existingComplaint.deadlineReason,
+        deadlineVersion: existingComplaint.deadlineVersion,
+        deadlineHistory: existingComplaint.deadlineHistory,
         technicianAssignedAt: null,
         resolvedAt: existingComplaint.resolvedAt,
       },
@@ -553,6 +637,141 @@ const assignComplaint = async (req, res) => {
 
     return res.status(500).json({
       message: "Server error while assigning complaint",
+    });
+  }
+};
+
+
+
+const updateComplaintDeadline = async (req, res) => {
+  try {
+    const { deadlineHours } = req.body;
+
+    const hours = Number(deadlineHours);
+
+    if (!Number.isFinite(hours) || hours <= 0) {
+      return res.status(400).json({
+        message: "Please select a valid deadline in hours.",
+      });
+    }
+
+    const complaint = await Complaint.findById(req.params.id);
+
+    if (!complaint) {
+      return res.status(404).json({
+        message: "Complaint not found.",
+      });
+    }
+
+    const admin = await User.findById(req.user.userId);
+
+    if (!admin || admin.role !== "admin") {
+      return res.status(403).json({
+        message: "Only an admin can update complaint deadlines.",
+      });
+    }
+
+    // Verify Admin's block access.
+    const normalizeBlock = (block) =>
+      String(block || "").trim().toLowerCase();
+
+    const canManageBlock = (admin.assignedBlocks || []).some(
+      (block) =>
+        normalizeBlock(block) === normalizeBlock(complaint.block)
+    );
+
+    if (!canManageBlock) {
+      return res.status(403).json({
+        message: "You are not authorized to manage this complaint.",
+      });
+    }
+
+    if (complaint.status === "Resolved" || complaint.isFake) {
+      return res.status(400).json({
+        message: "Resolved or fake complaints cannot have their deadlines changed.",
+      });
+    }
+
+    if (!complaint.supervisor) {
+      return res.status(400).json({
+        message: "Please assign this complaint to a supervisor first.",
+      });
+    }
+
+    const previousDeadline = complaint.deadline || null;
+    const changedAt = new Date();
+
+    // Calculate new deadline from the current time.
+    const newDeadline = new Date(
+      changedAt.getTime() + hours * 60 * 60 * 1000
+    );
+
+    const deadlineReason =
+      `Admin updated the resolution deadline to ${hours} hours.`;
+
+    // Save deadline history.
+    complaint.deadlineHistory.push({
+      previousDeadline,
+      newDeadline,
+      reason: deadlineReason,
+      changedBy: admin._id,
+      changedAt,
+    });
+
+    // Update Admin-controlled deadline.
+    complaint.deadline = newDeadline;
+    complaint.deadlineSetBy = admin._id;
+    complaint.deadlineReason = deadlineReason;
+    complaint.deadlineVersion =
+      (complaint.deadlineVersion || 0) + 1;
+
+    // Save audit history.
+    complaint.auditHistory.push({
+      action: "DEADLINE_UPDATED",
+      details: `Admin changed the resolution deadline to ${hours} hours. New deadline: ${newDeadline.toISOString()}`,
+      performedBy: admin._id,
+      performedAt: changedAt,
+    });
+
+    await complaint.save();
+
+    // Notify Supervisor.
+    await createNotification({
+      recipient: complaint.supervisor,
+      title: "Complaint Deadline Updated",
+      message: `The resolution deadline for complaint ${complaint._id} has been updated. New deadline: ${newDeadline.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}.`,
+      type: "system",
+      complaint: complaint._id,
+    });
+
+    // Notify Technician if already assigned.
+    if (complaint.technician) {
+      await createNotification({
+        recipient: complaint.technician,
+        title: "Resolution Deadline Updated",
+        message: `The resolution deadline for complaint ${complaint._id} has been updated. New deadline: ${newDeadline.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}.`,
+        type: "system",
+        complaint: complaint._id,
+      });
+    }
+
+    return res.json({
+      message: "Complaint deadline updated successfully.",
+      complaint: {
+        _id: complaint._id,
+        deadline: complaint.deadline,
+        deadlineSetBy: complaint.deadlineSetBy,
+        deadlineReason: complaint.deadlineReason,
+        deadlineVersion: complaint.deadlineVersion,
+        deadlineHistory: complaint.deadlineHistory,
+      },
+    });
+  } catch (error) {
+    console.error("UPDATE COMPLAINT DEADLINE ERROR:", error);
+
+    return res.status(500).json({
+      message: "Failed to update complaint deadline.",
+      error: error.message,
     });
   }
 };
@@ -595,16 +814,23 @@ const deleteComplaint = async (req, res) => {
 // =====================================================
 
 
+
 const uploadCompletionPhoto = async (req, res) => {
   try {
     const { completionImage, resolutionRemarks } = req.body;
 
-    if (!completionImage || !resolutionRemarks?.trim()) {
+    // Validate completion details.
+    if (
+      !completionImage ||
+      typeof completionImage !== "string" ||
+      !resolutionRemarks?.trim()
+    ) {
       return res.status(400).json({
         message: "Completion photo and resolution remarks are required.",
       });
     }
 
+    // Find complaint assigned to this technician.
     const complaint = await Complaint.findOne({
       _id: req.params.id,
       technician: req.user.userId,
@@ -617,20 +843,38 @@ const uploadCompletionPhoto = async (req, res) => {
       });
     }
 
+    // Prevent submission after resolution.
     if (complaint.status === "Resolved") {
       return res.status(400).json({
         message: "This complaint is already resolved.",
       });
     }
 
-    if (complaint.verificationStatus === "Pending") {
+    // Work must be started before completion submission.
+    if (complaint.status !== "In Progress") {
       return res.status(400).json({
-        message: "Your previous submission is awaiting verification.",
+        message: "Please start the work before submitting completion details.",
       });
     }
 
-    complaint.completionImage = completionImage;
+    // Prevent duplicate pending submissions.
+    if (complaint.verificationStatus === "Pending") {
+      return res.status(400).json({
+        message: "Your previous submission is awaiting supervisor verification.",
+      });
+    }
+
+    // Prevent resubmission after approval.
+    if (complaint.verificationStatus === "Approved") {
+      return res.status(400).json({
+        message: "This complaint has already been approved.",
+      });
+    }
+
+    // Save completion details.
+    complaint.completionImage = completionImage.trim();
     complaint.resolutionRemarks = resolutionRemarks.trim();
+
     complaint.verificationStatus = "Pending";
     complaint.verifiedBy = null;
     complaint.verifiedAt = null;
@@ -638,7 +882,8 @@ const uploadCompletionPhoto = async (req, res) => {
 
     complaint.auditHistory.push({
       action: "COMPLETION_SUBMITTED",
-      details: "Technician submitted completion photo and remarks for supervisor verification.",
+      details:
+        "Technician submitted completion photo and remarks for supervisor verification.",
       performedBy: req.user.userId,
       performedAt: new Date(),
     });
@@ -656,8 +901,9 @@ const uploadCompletionPhoto = async (req, res) => {
       });
     }
 
-    return res.json({
-      message: "Completion details submitted for supervisor verification.",
+    return res.status(200).json({
+      message:
+        "Completion details submitted for supervisor verification.",
       complaint,
     });
   } catch (error) {
@@ -669,6 +915,7 @@ const uploadCompletionPhoto = async (req, res) => {
     });
   }
 };
+
 
 
 // =====================================================
@@ -891,4 +1138,5 @@ module.exports = {
   // Fake Complaint Management
   markComplaintAsFake,
   getFakeComplaints,
+  updateComplaintDeadline,
 };

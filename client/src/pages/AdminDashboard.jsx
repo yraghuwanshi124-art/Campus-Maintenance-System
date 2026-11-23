@@ -12,6 +12,8 @@ function AdminDashboard() {
   const [supervisors, setSupervisors] = useState([]);
   const [selectedSupervisors, setSelectedSupervisors] = useState({});
   const [showLogout, setShowLogout] = useState(false);
+  const [selectedDeadlineHours, setSelectedDeadlineHours] = useState({});
+  const [assigningComplaint, setAssigningComplaint] = useState({});
 
   // Supervisor Management
   const [showSupervisorForm, setShowSupervisorForm] = useState(false);
@@ -35,7 +37,7 @@ function AdminDashboard() {
   // Read More / Show Less
   const [expandedComplaints, setExpandedComplaints] = useState({});
 
-const user = JSON.parse(localStorage.getItem("user"));
+  const user = JSON.parse(localStorage.getItem("user"));
   // ================= TOGGLE COMPLAINT =================
 
   const toggleComplaint = (complaintId) => {
@@ -224,18 +226,36 @@ const user = JSON.parse(localStorage.getItem("user"));
   // ================= ASSIGN COMPLAINT TO SUPERVISOR =================
 
   const assignComplaint = async (complaintId, supervisorId) => {
+    const deadlineHours = selectedDeadlineHours[complaintId];
+
+    if (!supervisorId) {
+      alert("Please select a supervisor first.");
+      return;
+    }
+
+    if (!deadlineHours || Number(deadlineHours) <= 0) {
+      alert("Please select a resolution deadline.");
+      return;
+    }
+
+    if (assigningComplaint[complaintId]) return;
     if (!supervisorId) {
       alert("Please select a supervisor first.");
       return;
     }
 
     try {
+      setAssigningComplaint((prev) => ({
+        ...prev,
+        [complaintId]: true,
+      }));
       const token = localStorage.getItem("token");
 
       const response = await api.patch(
         `/complaints/${complaintId}/assign`,
         {
           supervisorId,
+          deadlineHours: Number(deadlineHours),
         },
         {
           headers: {
@@ -264,6 +284,11 @@ const user = JSON.parse(localStorage.getItem("user"));
               assignedAt:
                 response.data.complaint?.assignedAt ||
                 new Date().toISOString(),
+
+              deadline: response.data.complaint?.deadline,
+              deadlineSetBy: response.data.complaint?.deadlineSetBy,
+              deadlineReason: response.data.complaint?.deadlineReason,
+              deadlineVersion: response.data.complaint?.deadlineVersion,
             }
             : complaint
         )
@@ -274,11 +299,22 @@ const user = JSON.parse(localStorage.getItem("user"));
         delete updated[complaintId];
         return updated;
       });
+
+      setSelectedDeadlineHours((prev) => {
+        const updated = { ...prev };
+        delete updated[complaintId];
+        return updated;
+      });
     } catch (error) {
       alert(
         error.response?.data?.message ||
         "Failed to assign complaint"
       );
+    } finally {
+      setAssigningComplaint((prev) => ({
+        ...prev,
+        [complaintId]: false,
+      }));
     }
   };
 
@@ -416,8 +452,8 @@ const user = JSON.parse(localStorage.getItem("user"));
 
   {/* ================= SUPERVISOR MANAGEMENT ================= */ }
   <section className={`mb-8 rounded-2xl border p-6 ${darkMode
-      ? "bg-gray-900 border-gray-700 text-white"
-      : "bg-white border-gray-200 text-gray-800"
+    ? "bg-gray-900 border-gray-700 text-white"
+    : "bg-white border-gray-200 text-gray-800"
     }`}>
     <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
       <div>
@@ -450,8 +486,8 @@ const user = JSON.parse(localStorage.getItem("user"));
             <div
               key={supervisor._id}
               className={`rounded-xl border p-4 ${darkMode
-                  ? "border-gray-700 bg-gray-800"
-                  : "border-gray-200 bg-gray-50"
+                ? "border-gray-700 bg-gray-800"
+                : "border-gray-200 bg-gray-50"
                 }`}
             >
               <div className="flex items-start justify-between gap-3">
@@ -466,8 +502,8 @@ const user = JSON.parse(localStorage.getItem("user"));
                 </div>
 
                 <span className={`text-xs px-2 py-1 rounded-lg font-semibold ${isLegacy
-                    ? "bg-amber-100 text-amber-800"
-                    : "bg-green-100 text-green-800"
+                  ? "bg-amber-100 text-amber-800"
+                  : "bg-green-100 text-green-800"
                   }`}>
                   {isLegacy ? "Legacy" : "Block Supervisor"}
                 </span>
@@ -535,8 +571,8 @@ const user = JSON.parse(localStorage.getItem("user"));
                   })
                 }
                 className={`w-full rounded-xl border p-3 outline-none ${darkMode
-                    ? "bg-gray-800 border-gray-700"
-                    : "bg-white border-gray-300"
+                  ? "bg-gray-800 border-gray-700"
+                  : "bg-white border-gray-300"
                   }`}
                 placeholder="Enter name"
               />
@@ -557,8 +593,8 @@ const user = JSON.parse(localStorage.getItem("user"));
                   })
                 }
                 className={`w-full rounded-xl border p-3 outline-none ${darkMode
-                    ? "bg-gray-800 border-gray-700"
-                    : "bg-white border-gray-300"
+                  ? "bg-gray-800 border-gray-700"
+                  : "bg-white border-gray-300"
                   }`}
                 placeholder="Enter email"
               />
@@ -579,8 +615,8 @@ const user = JSON.parse(localStorage.getItem("user"));
                   })
                 }
                 className={`w-full rounded-xl border p-3 outline-none ${darkMode
-                    ? "bg-gray-800 border-gray-700"
-                    : "bg-white border-gray-300"
+                  ? "bg-gray-800 border-gray-700"
+                  : "bg-white border-gray-300"
                   }`}
                 placeholder="Enter phone number"
               />
@@ -601,8 +637,8 @@ const user = JSON.parse(localStorage.getItem("user"));
                   })
                 }
                 className={`w-full rounded-xl border p-3 outline-none ${darkMode
-                    ? "bg-gray-800 border-gray-700"
-                    : "bg-white border-gray-300"
+                  ? "bg-gray-800 border-gray-700"
+                  : "bg-white border-gray-300"
                   }`}
               >
                 <option value="">Select Block</option>
@@ -636,8 +672,8 @@ const user = JSON.parse(localStorage.getItem("user"));
                   })
                 }
                 className={`w-full rounded-xl border p-3 outline-none ${darkMode
-                    ? "bg-gray-800 border-gray-700"
-                    : "bg-white border-gray-300"
+                  ? "bg-gray-800 border-gray-700"
+                  : "bg-white border-gray-300"
                   }`}
                 placeholder={
                   editingSupervisor
@@ -652,8 +688,8 @@ const user = JSON.parse(localStorage.getItem("user"));
                 type="button"
                 onClick={resetSupervisorForm}
                 className={`flex-1 rounded-xl py-3 font-semibold ${darkMode
-                    ? "bg-gray-700 hover:bg-gray-600"
-                    : "bg-gray-200 hover:bg-gray-300"
+                  ? "bg-gray-700 hover:bg-gray-600"
+                  : "bg-gray-200 hover:bg-gray-300"
                   }`}
               >
                 Cancel
@@ -763,16 +799,16 @@ const user = JSON.parse(localStorage.getItem("user"));
 
         <nav
           className={`border-b shadow-sm transition-colors duration-200 ${darkMode
-              ? "border-slate-800 bg-slate-900/90 text-white"
-              : "border-indigo-100 bg-indigo-50"
+            ? "border-slate-800 bg-slate-900/90 text-white"
+            : "border-indigo-100 bg-indigo-50"
             }`}
         >
           <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
             <div className="flex items-center gap-5">
               <div
                 className={`rounded-xl px-3 py-1.5 shadow-sm ${darkMode
-                    ? "border border-slate-700 bg-slate-800"
-                    : "bg-white"
+                  ? "border border-slate-700 bg-slate-800"
+                  : "bg-white"
                   }`}
               >
                 <img
@@ -830,8 +866,8 @@ const user = JSON.parse(localStorage.getItem("user"));
               <button
                 onClick={() => setShowLogout(true)}
                 className={`rounded-xl px-5 py-2.5 text-base font-semibold shadow-sm transition ${darkMode
-                    ? "border border-slate-700 bg-slate-800 text-slate-200 hover:border-red-900/50 hover:bg-red-950/30 hover:text-red-400"
-                    : "border border-indigo-200 bg-white text-slate-700 hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+                  ? "border border-slate-700 bg-slate-800 text-slate-200 hover:border-red-900/50 hover:bg-red-950/30 hover:text-red-400"
+                  : "border border-indigo-200 bg-white text-slate-700 hover:border-red-200 hover:bg-red-50 hover:text-red-600"
                   }`}
               >
                 Logout
@@ -887,8 +923,8 @@ const user = JSON.parse(localStorage.getItem("user"));
 
               <div
                 className={`rounded-2xl border p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md ${darkMode
-                    ? "border-slate-800 bg-slate-900"
-                    : "border-indigo-100 bg-white"
+                  ? "border-slate-800 bg-slate-900"
+                  : "border-indigo-100 bg-white"
                   }`}
               >
                 <div className="flex items-center justify-between">
@@ -917,8 +953,8 @@ const user = JSON.parse(localStorage.getItem("user"));
 
               <div
                 className={`rounded-2xl border p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md ${darkMode
-                    ? "border-slate-800 bg-slate-900"
-                    : "border-blue-100 bg-white"
+                  ? "border-slate-800 bg-slate-900"
+                  : "border-blue-100 bg-white"
                   }`}
               >
                 <div className="flex items-center justify-between">
@@ -947,8 +983,8 @@ const user = JSON.parse(localStorage.getItem("user"));
 
               <div
                 className={`rounded-2xl border p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md ${darkMode
-                    ? "border-slate-800 bg-slate-900"
-                    : "border-orange-100 bg-white"
+                  ? "border-slate-800 bg-slate-900"
+                  : "border-orange-100 bg-white"
                   }`}
               >
                 <div className="flex items-center justify-between">
@@ -977,8 +1013,8 @@ const user = JSON.parse(localStorage.getItem("user"));
 
               <div
                 className={`rounded-2xl border p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md ${darkMode
-                    ? "border-slate-800 bg-slate-900"
-                    : "border-purple-100 bg-white"
+                  ? "border-slate-800 bg-slate-900"
+                  : "border-purple-100 bg-white"
                   }`}
               >
                 <div className="flex items-center justify-between">
@@ -1007,8 +1043,8 @@ const user = JSON.parse(localStorage.getItem("user"));
 
               <div
                 className={`rounded-2xl border p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md ${darkMode
-                    ? "border-slate-800 bg-slate-900"
-                    : "border-emerald-100 bg-white"
+                  ? "border-slate-800 bg-slate-900"
+                  : "border-emerald-100 bg-white"
                   }`}
               >
                 <div className="flex items-center justify-between">
@@ -1121,8 +1157,8 @@ const user = JSON.parse(localStorage.getItem("user"));
                     }
                     placeholder="Search by complaint, student, block, room..."
                     className={`w-full rounded-2xl border py-3.5 pl-12 pr-4 text-sm font-medium shadow-sm outline-none transition ${darkMode
-                        ? "border-slate-700 bg-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-950"
-                        : "border-slate-200 bg-white text-slate-700 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                      ? "border-slate-700 bg-slate-800 text-slate-100 placeholder:text-slate-500 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-950"
+                      : "border-slate-200 bg-white text-slate-700 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                       }`}
                   />
                 </div>
@@ -1141,10 +1177,10 @@ const user = JSON.parse(localStorage.getItem("user"));
                         setStatusFilter(filter.name)
                       }
                       className={`rounded-xl px-4 py-2.5 text-xs font-bold transition ${statusFilter === filter.name
-                          ? "bg-indigo-600 text-white shadow-md"
-                          : darkMode
-                            ? "border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700"
-                            : "border border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-600"
+                        ? "bg-indigo-600 text-white shadow-md"
+                        : darkMode
+                          ? "border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700"
+                          : "border border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-600"
                         }`}
                     >
                       {filter.icon} {filter.name}
@@ -1160,8 +1196,8 @@ const user = JSON.parse(localStorage.getItem("user"));
           {displayedComplaints.length === 0 ? (
             <div
               className={`rounded-3xl border border-dashed p-12 text-center shadow-sm ${darkMode
-                  ? "border-slate-800 bg-slate-900"
-                  : "border-slate-300 bg-white"
+                ? "border-slate-800 bg-slate-900"
+                : "border-slate-300 bg-white"
                 }`}
             >
               <div
@@ -1277,12 +1313,12 @@ const user = JSON.parse(localStorage.getItem("user"));
 
                     <div
                       className={`h-1.5 ${complaint.status === "Resolved"
-                          ? "bg-emerald-500"
-                          : complaint.status === "In Progress"
-                            ? "bg-purple-500"
-                            : complaint.status === "Assigned"
-                              ? "bg-orange-500"
-                              : "bg-blue-500"
+                        ? "bg-emerald-500"
+                        : complaint.status === "In Progress"
+                          ? "bg-purple-500"
+                          : complaint.status === "Assigned"
+                            ? "bg-orange-500"
+                            : "bg-blue-500"
                         }`}
                     />
 
@@ -1295,12 +1331,12 @@ const user = JSON.parse(localStorage.getItem("user"));
                         <div className="flex gap-4">
                           <div
                             className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-2xl ${complaint.status === "Resolved"
-                                ? "bg-emerald-50 dark:bg-emerald-950/50"
-                                : complaint.status === "In Progress"
-                                  ? "bg-purple-50 dark:bg-purple-950/50"
-                                  : complaint.status === "Assigned"
-                                    ? "bg-orange-50 dark:bg-orange-950/50"
-                                    : "bg-indigo-50 dark:bg-indigo-950/50"
+                              ? "bg-emerald-50 dark:bg-emerald-950/50"
+                              : complaint.status === "In Progress"
+                                ? "bg-purple-50 dark:bg-purple-950/50"
+                                : complaint.status === "Assigned"
+                                  ? "bg-orange-50 dark:bg-orange-950/50"
+                                  : "bg-indigo-50 dark:bg-indigo-950/50"
                               }`}
                           >
                             🛠️
@@ -1831,6 +1867,8 @@ const user = JSON.parse(localStorage.getItem("user"));
                                   }
                                   className="w-full max-w-xl rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-indigo-400 dark:focus:ring-indigo-950"
                                 >
+
+
                                   <option value="">
                                     Select supervisor
                                   </option>
@@ -1843,7 +1881,24 @@ const user = JSON.parse(localStorage.getItem("user"));
                                   ))}
 
                                 </select>
-
+                                <select
+                                  value={selectedDeadlineHours[complaint._id] || ""}
+                                  onChange={(e) =>
+                                    setSelectedDeadlineHours((prev) => ({
+                                      ...prev,
+                                      [complaint._id]: e.target.value,
+                                    }))
+                                  }
+                                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                >
+                                  <option value="">Select Deadline</option>
+                                  <option value="6">6 Hours</option>
+                                  <option value="12">12 Hours</option>
+                                  <option value="24">24 Hours</option>
+                                  <option value="48">48 Hours</option>
+                                  <option value="72">72 Hours</option>
+                                  <option value="120">120 Hours</option>
+                                </select>
                                 <button
                                   onClick={() => {
                                     const supervisorId =
@@ -1859,14 +1914,16 @@ const user = JSON.parse(localStorage.getItem("user"));
                                     );
                                   }}
                                   disabled={
-                                    !selectedSupervisors[
-                                    complaint._id
-                                    ] &&
-                                    !complaint.supervisor
+                                    assigningComplaint[complaint._id] ||
+                                    (!selectedSupervisors[complaint._id] &&
+                                      !complaint.supervisor) ||
+                                    !selectedDeadlineHours[complaint._id]
                                   }
                                   className="rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 dark:disabled:bg-slate-700"
                                 >
-                                  👨‍💼 Assign Supervisor
+                                  {assigningComplaint[complaint._id]
+                                    ? "Assigning..."
+                                    : "Assign Complaint"}
                                 </button>
                               </div>
 

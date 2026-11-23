@@ -6,7 +6,133 @@ import SupervisorSidebar from "../components/SupervisorSidebar";
 import LogoutModal from "../components/LogoutModal";
 import { useTheme } from "../context/ThemeContext";
 
-function SupervisorComplaints() {
+const formatDateTime = (date) => {
+  if (!date) return "Not available";
+
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) return "Not available";
+
+  return parsed.toLocaleString("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+};
+
+const getDeadlineState = (complaint) => {
+  if (!complaint.deadline) return "Not Set";
+  if (complaint.status === "Resolved") return "Completed";
+
+  return new Date(complaint.deadline) < new Date()
+    ? "Overdue"
+    : "On Track";
+};
+
+const getRemainingTime = (deadline) => {
+  if (!deadline) return "No deadline set";
+
+  const difference = new Date(deadline).getTime() - Date.now();
+
+  if (Number.isNaN(difference)) return "Not available";
+  if (difference <= 0) return "Deadline passed";
+
+  const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((difference / (1000 * 60 * 60)) % 24);
+  const minutes = Math.floor((difference / (1000 * 60)) % 60);
+
+  if (days > 0) return `${days}d ${hours}h remaining`;
+  if (hours > 0) return `${hours}h ${minutes}m remaining`;
+
+  return `${minutes}m remaining`;
+};
+
+const getTechnician = (complaint) =>
+  complaint.technician ||
+  complaint.assignedTechnician ||
+  complaint.assignedTo ||
+  null;
+
+const getTechnicianName = (complaint) => {
+  const technician = getTechnician(complaint);
+
+  if (!technician) return "Not assigned";
+  if (typeof technician === "string") return technician;
+
+  return (
+    technician.name ||
+    technician.fullName ||
+    technician.user?.name ||
+    "Not assigned"
+  );
+};
+
+const getTechnicianId = (complaint) => {
+  const technician = getTechnician(complaint);
+
+  if (!technician) return "";
+  if (typeof technician === "string") return technician;
+
+  return technician._id || technician.id || "";
+};
+
+const SectionHeading = ({ title, subtitle, darkMode }) => (
+  <div className="mb-3">
+    <h3
+      className={`text-base font-bold ${darkMode ? "text-white" : "text-slate-900"
+        }`}
+    >
+      {title}
+    </h3>
+    {subtitle && (
+      <p
+        className={`mt-1 text-xs ${darkMode ? "text-slate-400" : "text-slate-500"
+          }`}
+      >
+        {subtitle}
+      </p>
+    )}
+  </div>
+);
+
+const StatCard = ({ label, value, darkMode }) => (
+  <div
+    className={`rounded-xl border p-4 ${darkMode
+      ? "border-slate-700 bg-slate-800"
+      : "border-slate-200 bg-white"
+      }`}
+  >
+    <p
+      className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? "text-slate-400" : "text-slate-500"
+        }`}
+    >
+      {label}
+    </p>
+    <p
+      className={`mt-2 text-2xl font-bold ${darkMode ? "text-white" : "text-slate-900"
+        }`}
+    >
+      {value}
+    </p>
+  </div>
+);
+
+const InfoItem = ({ label, value, darkMode }) => (
+  <div className="min-w-0">
+    <p
+      className={`text-xs font-medium ${darkMode ? "text-slate-400" : "text-slate-500"
+        }`}
+    >
+      {label}
+    </p>
+    <p
+      className={`mt-1 break-words text-sm font-semibold ${darkMode ? "text-slate-100" : "text-slate-800"
+        }`}
+    >
+      {value || "Not provided"}
+    </p>
+  </div>
+);
+
+export default function SupervisorComplaints() {
   const location = useLocation();
   const { darkMode } = useTheme();
 
@@ -17,16 +143,13 @@ function SupervisorComplaints() {
   const [refreshing, setRefreshing] = useState(false);
 
   const [assigningId, setAssigningId] = useState(null);
-  const [deadlineSavingId, setDeadlineSavingId] = useState(null);
   const [verifyingId, setVerifyingId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   const [selectedTechnician, setSelectedTechnician] = useState({});
   const [assignmentReasons, setAssignmentReasons] = useState({});
-  const [deadlineValues, setDeadlineValues] = useState({});
-  const [deadlineReasons, setDeadlineReasons] = useState({});
-  const [useSuggestedDeadline, setUseSuggestedDeadline] = useState({});
-
   const [verificationRemarks, setVerificationRemarks] = useState({});
+  const [expandedComplaints, setExpandedComplaints] = useState({});
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
@@ -37,16 +160,18 @@ function SupervisorComplaints() {
 
   const [showLogout, setShowLogout] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
-  const [expandedComplaintId, setExpandedComplaintId] = useState(null);
 
   const selectedComplaintId = location.state?.complaintId || null;
 
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
-  const assignedBlocks = user?.assignedBlocks || [];
+  const [user] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("user") || "{}");
+    } catch {
+      return {};
+    }
+  });
 
-  // --------------------------------------------------
-  // THEME
-  // --------------------------------------------------
+  const assignedBlocks = user?.assignedBlocks || [];
 
   const surface = darkMode
     ? "border-slate-700 bg-slate-800"
@@ -56,42 +181,30 @@ function SupervisorComplaints() {
     ? "border-slate-700 bg-slate-900"
     : "border-slate-200 bg-slate-50";
 
-  const headingText = darkMode
-    ? "text-slate-100"
-    : "text-slate-900";
+  const headingText = darkMode ? "text-slate-100" : "text-slate-900";
+  const bodyText = darkMode ? "text-slate-300" : "text-slate-700";
+  const secondaryText = darkMode ? "text-slate-400" : "text-slate-500";
 
-  const bodyText = darkMode
-    ? "text-slate-300"
-    : "text-slate-700";
+  const inputClass = `w-full rounded-lg border px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 ${darkMode
+    ? "border-slate-600 bg-slate-900 text-slate-100 placeholder:text-slate-500"
+    : "border-slate-200 bg-white text-slate-700 placeholder:text-slate-400"
+    }`;
 
-  const secondaryText = darkMode
-    ? "text-slate-400"
-    : "text-slate-500";
+  const buttonClass =
+    "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50";
 
-  const inputClass = darkMode
-    ? "border-slate-600 bg-slate-900 text-slate-100 placeholder:text-slate-500 focus:border-indigo-400"
-    : "border-slate-200 bg-white text-slate-700 placeholder:text-slate-400 focus:border-indigo-500";
-
-  // --------------------------------------------------
-  // FETCH DATA
-  // --------------------------------------------------
-
+  // Fetch complaints
   const fetchComplaints = async (showRefresh = false) => {
+    if (showRefresh) setRefreshing(true);
+    else setLoading(true);
+
     try {
-      if (showRefresh) setRefreshing(true);
-      else setLoading(true);
-
-      setErrorMessage("");
-
       const response = await api.get("/supervisor/complaints");
-
       setComplaints(response.data.complaints || []);
+      setErrorMessage("");
     } catch (error) {
-      console.error("FETCH COMPLAINTS ERROR:", error);
-
       setErrorMessage(
-        error.response?.data?.message ||
-        "Failed to load complaints."
+        error.response?.data?.message || "Failed to load complaints."
       );
     } finally {
       setLoading(false);
@@ -99,18 +212,18 @@ function SupervisorComplaints() {
     }
   };
 
+  // Fetch technicians
   const fetchTechnicians = async () => {
     try {
       const response = await api.get("/supervisor/technicians");
 
-      setTechnicians(response.data.technicians || []);
-    } catch (error) {
-      console.error("FETCH TECHNICIANS ERROR:", error);
-
-      setErrorMessage(
-        error.response?.data?.message ||
-        "Failed to load technicians."
+      setTechnicians(
+        Array.isArray(response.data)
+          ? response.data
+          : response.data.technicians || []
       );
+    } catch (error) {
+      console.error("Failed to load technicians:", error);
     }
   };
 
@@ -119,10 +232,14 @@ function SupervisorComplaints() {
     fetchTechnicians();
   }, []);
 
-  // --------------------------------------------------
-  // SPECIALIZATION
-  // --------------------------------------------------
+  const toggleComplaint = (id) => {
+    setExpandedComplaints((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+  };
 
+  // Technician specialization
   const specializationMap = {
     Computer: "Computer Technician",
     Fan: "Electrician",
@@ -135,79 +252,25 @@ function SupervisorComplaints() {
   const getTechniciansForComplaint = (category) => {
     const required = specializationMap[category];
 
-    return technicians.filter((technician) => {
-      if (!required) return true;
-
-      return (
+    return technicians.filter(
+      (technician) =>
+        !required ||
         technician.specialization === required ||
         technician.specialization === "General"
-      );
-    });
+    );
   };
 
-  // --------------------------------------------------
-  // DATE HELPERS
-  // --------------------------------------------------
-
-  const formatDateTime = (date) => {
-    if (!date) return "Not available";
-
-    return new Date(date).toLocaleString("en-IN", {
-      dateStyle: "medium",
-      timeStyle: "short",
-    });
-  };
-
-  const toDateTimeLocal = (date) => {
-    if (!date) return "";
-
-    const value = new Date(date);
-
-    const offset = value.getTimezoneOffset() * 60000;
-
-    return new Date(value.getTime() - offset)
-      .toISOString()
-      .slice(0, 16);
-  };
-
-  const getDeadlineState = (complaint) => {
-    if (!complaint.deadline) return "Not Set";
-
-    if (complaint.status === "Resolved") return "Completed";
-
-    return new Date(complaint.deadline) < new Date()
-      ? "Overdue"
-      : "On Track";
-  };
-
-  const getRemainingTime = (deadline) => {
-    if (!deadline) return "No deadline";
-
-    const difference =
-      new Date(deadline).getTime() - Date.now();
-
-    if (difference <= 0) return "Deadline passed";
-
-    const hours = Math.floor(difference / 3600000);
-    const days = Math.floor(hours / 24);
-
-    if (days > 0) return `${days} day(s) remaining`;
-
-    if (hours > 0) return `${hours} hour(s) remaining`;
-
-    const minutes = Math.max(
-      1,
-      Math.floor(difference / 60000)
+  // Assign technician
+  const handleAssignTechnician = async (complaintId) => {
+    const complaint = complaints.find(
+      (item) => (item._id || item.id) === complaintId
     );
 
-    return `${minutes} minute(s) remaining`;
-  };
+    if (complaint?.status === "Resolved") {
+      setErrorMessage("Resolved complaints cannot be reassigned.");
+      return;
+    }
 
-  // --------------------------------------------------
-  // ASSIGN / REASSIGN TECHNICIAN
-  // --------------------------------------------------
-
-  const handleAssignTechnician = async (complaintId) => {
     const technicianId = selectedTechnician[complaintId];
     const reason = assignmentReasons[complaintId]?.trim();
 
@@ -221,32 +284,26 @@ function SupervisorComplaints() {
       return;
     }
 
+    setAssigningId(complaintId);
+    setMessage("");
+    setErrorMessage("");
+
     try {
-      setAssigningId(complaintId);
-      setMessage("");
-      setErrorMessage("");
-
-      const response = await api.patch(
+      await api.patch(
         `/supervisor/complaints/${complaintId}/assign-technician`,
-        {
-          technicianId,
-          reason,
-        }
+        { technicianId, reason }
       );
 
-      setMessage(
-        response.data.message ||
-        "Technician assigned successfully."
-      );
+      setMessage("Technician assigned successfully.");
 
-      setAssignmentReasons((previous) => ({
-        ...previous,
+      setAssignmentReasons((prev) => ({
+        ...prev,
         [complaintId]: "",
       }));
 
-      setSelectedTechnician((previous) => ({
-        ...previous,
-        [complaintId]: "",
+      setSelectedTechnician((prev) => ({
+        ...prev,
+        [complaintId]: technicianId,
       }));
 
       await Promise.all([
@@ -254,300 +311,214 @@ function SupervisorComplaints() {
         fetchTechnicians(),
       ]);
     } catch (error) {
-      console.error("ASSIGN TECHNICIAN ERROR:", error);
-
       setErrorMessage(
-        error.response?.data?.message ||
-        "Failed to assign technician."
+        error.response?.data?.message || "Failed to assign technician."
       );
     } finally {
       setAssigningId(null);
     }
+
   };
 
-  // --------------------------------------------------
-  // SET / CHANGE DEADLINE
-  // --------------------------------------------------
-
-  const handleSetDeadline = async (complaintId) => {
-    const useSuggested = !!useSuggestedDeadline[complaintId];
-    const deadline = deadlineValues[complaintId];
-    const reason = deadlineReasons[complaintId]?.trim();
-
-    if (!useSuggested && !deadline) {
-      setErrorMessage("Please select a deadline.");
-      return;
-    }
-
-    if (!useSuggested && !reason) {
-      setErrorMessage(
-        "A reason is required when changing the suggested deadline."
-      );
-      return;
-    }
-
-    if (
-      !useSuggested &&
-      new Date(deadline).getTime() <= Date.now()
-    ) {
-      setErrorMessage("Deadline must be in the future.");
-      return;
-    }
-
-    try {
-      setDeadlineSavingId(complaintId);
-      setMessage("");
-      setErrorMessage("");
-
-      const payload = useSuggested
-        ? { useSuggestedDeadline: true }
-        : {
-            deadline: new Date(deadline).toISOString(),
-            reason,
-          };
-
-      const response = await api.patch(
-        `/supervisor/complaints/${complaintId}/deadline`,
-        payload
-      );
-
-      setMessage(
-        response.data.message ||
-        "Deadline updated successfully."
-      );
-
-      setDeadlineReasons((previous) => ({
-        ...previous,
-        [complaintId]: "",
-      }));
-
-      setDeadlineValues((previous) => ({
-        ...previous,
-        [complaintId]: "",
-      }));
-
-      await fetchComplaints(true);
-    } catch (error) {
-      console.error("SET DEADLINE ERROR:", error);
-
-      setErrorMessage(
-        error.response?.data?.message ||
-        "Failed to update deadline."
-      );
-    } finally {
-      setDeadlineSavingId(null);
-    }
-  };
-
-  // --------------------------------------------------
-  // VERIFY COMPLETION
-  // --------------------------------------------------
-
+  // Verify complaint
   const handleVerification = async (complaintId, decision) => {
-    const remarks =
-      verificationRemarks[complaintId]?.trim() || "";
+    const remarks = verificationRemarks[complaintId]?.trim() || "";
 
     if (decision === "Rejected" && !remarks) {
-      setErrorMessage(
-        "Please provide a reason for rejecting the completion."
-      );
+      setErrorMessage("Please enter remarks before rejecting.");
       return;
     }
 
     const confirmed = window.confirm(
-      decision === "Approved"
-        ? "Are you sure you want to approve this completion?"
-        : "Are you sure you want to reject this completion?"
+      `Are you sure you want to ${decision.toLowerCase()} this complaint?`
     );
 
     if (!confirmed) return;
 
+    setVerifyingId(complaintId);
+    setMessage("");
+    setErrorMessage("");
+
     try {
-      setVerifyingId(complaintId);
-      setMessage("");
-      setErrorMessage("");
-
-      const response = await api.patch(
+      await api.patch(
         `/supervisor/complaints/${complaintId}/verify`,
-        {
-          decision,
-          remarks,
-        }
+        { decision, remarks }
       );
 
-      setMessage(
-        response.data.message ||
-        `Completion ${decision.toLowerCase()} successfully.`
-      );
+      setMessage(`Complaint ${decision.toLowerCase()} successfully.`);
 
-      setVerificationRemarks((previous) => ({
-        ...previous,
+      setVerificationRemarks((prev) => ({
+        ...prev,
         [complaintId]: "",
       }));
 
       await fetchComplaints(true);
     } catch (error) {
-      console.error("VERIFICATION ERROR:", error);
-
       setErrorMessage(
-        error.response?.data?.message ||
-        "Failed to verify completion."
+        error.response?.data?.message || "Verification failed."
       );
     } finally {
       setVerifyingId(null);
     }
   };
 
-  // --------------------------------------------------
-  // FILTERS
-  // --------------------------------------------------
 
+  // Delete resolved complaint
+  const handleDeleteComplaint = async (complaintId) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to permanently delete this resolved complaint? This action cannot be undone."
+    );
+
+    if (!confirmed) return;
+
+    setDeletingId(complaintId);
+    setMessage("");
+    setErrorMessage("");
+
+    try {
+      const response = await api.delete(
+        `/supervisor/complaints/${complaintId}`
+      );
+
+      // Remove deleted complaint from the current list
+      setComplaints((prev) =>
+        prev.filter(
+          (complaint) =>
+            String(complaint._id) !== String(complaintId)
+        )
+      );
+
+      // Remove its expanded state
+      setExpandedComplaints((prev) => {
+        const updated = { ...prev };
+        delete updated[complaintId];
+        return updated;
+      });
+
+      setMessage(
+        response.data?.message ||
+        "Resolved complaint deleted successfully."
+      );
+    } catch (error) {
+      setErrorMessage(
+        error.response?.data?.message ||
+        "Failed to delete complaint. Please try again."
+      );
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+
+
+  // Filters
   const filteredComplaints = useMemo(() => {
-    const search = searchTerm.trim().toLowerCase();
-
     return complaints.filter((complaint) => {
-      const matchesSearch =
-        !search ||
-        complaint.block?.toLowerCase().includes(search) ||
-        complaint.floor?.toString().toLowerCase().includes(search) ||
-        complaint.room?.toString().toLowerCase().includes(search) ||
-        complaint.category?.toLowerCase().includes(search) ||
-        complaint.description?.toLowerCase().includes(search) ||
-        complaint.technician?.name?.toLowerCase().includes(search);
+      if (
+        selectedComplaintId &&
+        String(complaint._id) !== String(selectedComplaintId)
+      ) {
+        return false;
+      }
+
+      const student = complaint.user || complaint.student || {};
+      const technicianName = getTechnicianName(complaint);
+
+      const searchContent = [
+        complaint._id,
+        complaint.category,
+        complaint.title,
+        complaint.description,
+        complaint.block,
+        complaint.floor,
+        complaint.room,
+        complaint.status,
+        complaint.priority,
+        technicianName,
+        student.name,
+        student.fullName,
+        student.email,
+        student.enrollmentNumber,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      const matchesSearch = searchContent.includes(
+        searchTerm.toLowerCase().trim()
+      );
 
       const matchesStatus =
-        statusFilter === "All" ||
-        complaint.status === statusFilter;
+        statusFilter === "All" || complaint.status === statusFilter;
 
       const matchesPriority =
-        priorityFilter === "All" ||
-        complaint.priority === priorityFilter;
+        priorityFilter === "All" || complaint.priority === priorityFilter;
 
-      return (
-        matchesSearch &&
-        matchesStatus &&
-        matchesPriority
-      );
+      return matchesSearch && matchesStatus && matchesPriority;
     });
   }, [
     complaints,
+    selectedComplaintId,
     searchTerm,
     statusFilter,
     priorityFilter,
   ]);
 
-  const visibleComplaints = useMemo(() => {
-    if (!selectedComplaintId) return filteredComplaints;
+  // Dashboard stats
+  const stats = useMemo(() => ({
+    total: complaints.length,
+    pending: complaints.filter((item) => item.status === "Pending").length,
+    active: complaints.filter((item) =>
+      ["Assigned", "In Progress"].includes(item.status)
+    ).length,
+    resolved: complaints.filter((item) => item.status === "Resolved").length,
+    overdue: complaints.filter(
+      (item) => getDeadlineState(item) === "Overdue"
+    ).length,
+awaitingVerification: complaints.filter(
+  (item) => item.verificationStatus === "Pending"
+).length,
+  }), [complaints]);
 
-    return complaints.filter(
-      (complaint) => complaint._id === selectedComplaintId
-    );
-  }, [
-    complaints,
-    filteredComplaints,
-    selectedComplaintId,
-  ]);
-
-  // --------------------------------------------------
-  // STATISTICS
-  // --------------------------------------------------
-
-  const totalComplaints = complaints.length;
-
-  const pendingComplaints = complaints.filter(
-    (complaint) =>
-      complaint.status === "Pending" ||
-      !complaint.technician
-  ).length;
-
-  const activeComplaints = complaints.filter(
-    (complaint) =>
-      complaint.status === "Assigned" ||
-      complaint.status === "In Progress"
-  ).length;
-
-  const resolvedComplaints = complaints.filter(
-    (complaint) => complaint.status === "Resolved"
-  ).length;
-
-  const overdueComplaints = complaints.filter(
-    (complaint) =>
-      complaint.status !== "Resolved" &&
-      complaint.deadline &&
-      new Date(complaint.deadline) < new Date()
-  ).length;
-
-  const awaitingVerification = complaints.filter(
-    (complaint) =>
-      complaint.verificationStatus === "Pending"
-  ).length;
-
-  // --------------------------------------------------
-  // COLORS
-  // --------------------------------------------------
-
-  const getStatusColor = (status) => {
-    const colors = {
-      Pending: "border-amber-500/30 bg-amber-500/10 text-amber-500",
-      Assigned: "border-blue-500/30 bg-blue-500/10 text-blue-500",
-      "In Progress": "border-violet-500/30 bg-violet-500/10 text-violet-500",
-      Resolved: "border-emerald-500/30 bg-emerald-500/10 text-emerald-500",
+  const getStatusStyle = (status) => {
+    const styles = {
+      Pending: "bg-amber-100 text-amber-800",
+      Assigned: "bg-blue-100 text-blue-800",
+      "In Progress": "bg-indigo-100 text-indigo-800",
+      Resolved: "bg-emerald-100 text-emerald-800",
     };
 
-    return colors[status] ||
-      "border-slate-500/30 bg-slate-500/10 text-slate-500";
+    return styles[status] || "bg-slate-100 text-slate-700";
   };
 
-  const getPriorityColor = (priority) => {
-    const colors = {
-      High: "border-red-500/30 bg-red-500/10 text-red-500",
-      Medium: "border-orange-500/30 bg-orange-500/10 text-orange-500",
-      Low: "border-green-500/30 bg-green-500/10 text-green-500",
+  const getPriorityStyle = (priority) => {
+    const styles = {
+      High: "bg-red-100 text-red-800",
+      Medium: "bg-orange-100 text-orange-800",
+      Low: "bg-green-100 text-green-800",
     };
 
-    return colors[priority] ||
-      "border-slate-500/30 bg-slate-500/10 text-slate-500";
+    return styles[priority] || "bg-slate-100 text-slate-700";
   };
 
-  const getDeadlineColor = (state) => {
-    if (state === "Overdue") {
-      return "border-red-500/30 bg-red-500/10 text-red-500";
-    }
-
-    if (state === "Completed") {
-      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-500";
-    }
-
-    if (state === "On Track") {
-      return "border-blue-500/30 bg-blue-500/10 text-blue-500";
-    }
-
-    return "border-slate-500/30 bg-slate-500/10 text-slate-500";
+  const getDeadlineStyle = (state) => {
+    if (state === "Overdue") return "text-red-500";
+    if (state === "On Track") return "text-emerald-500";
+    if (state === "Completed") return "text-blue-500";
+    return secondaryText;
   };
-
-  const getWorkloadColor = (level) => {
-    if (level === "High") return "text-red-500";
-    if (level === "Medium") return "text-orange-500";
-    return "text-emerald-500";
-  };
-
-  // --------------------------------------------------
-  // FILTER COUNT
-  // --------------------------------------------------
 
   const getFilterCount = (filter) => {
     if (filter === "All") return complaints.length;
-    if (filter === "Pending") return pendingComplaints;
-    if (filter === "Resolved") return resolvedComplaints;
 
-    return complaints.filter(
-      (complaint) => complaint.status === filter
-    ).length;
+    return complaints.filter((item) => item.status === filter).length;
   };
 
-  // --------------------------------------------------
-  // NAVIGATION
-  // --------------------------------------------------
+  const resetFilters = () => {
+    setSearchTerm("");
+    setStatusFilter("All");
+    setPriorityFilter("All");
+  };
 
   const handleBackToAll = () => {
     window.history.replaceState(
@@ -555,1046 +526,698 @@ function SupervisorComplaints() {
       document.title,
       window.location.pathname
     );
-
     window.location.reload();
   };
 
-  const toggleDescription = (id) => {
-    setExpandedComplaintId((previous) =>
-      previous === id ? null : id
-    );
-  };
-
-  // --------------------------------------------------
-  // STAT CARD
-  // --------------------------------------------------
-
-  const StatCard = ({ title, value, icon, color }) => (
-    <div
-      className={`rounded-2xl border p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${surface}`}
-    >
-      <div className="flex items-center justify-between">
-        <div>
-          <p className={`text-xs font-bold uppercase tracking-wider ${secondaryText}`}>
-            {title}
-          </p>
-
-          <p className={`mt-2 text-3xl font-black ${color}`}>
-            {value}
-          </p>
-        </div>
-
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-500/10 text-xl">
-          {icon}
-        </div>
-      </div>
-    </div>
-  );
-
-  // --------------------------------------------------
-  // RENDER
-  // --------------------------------------------------
-
   return (
     <div
-      className={`min-h-screen transition-colors duration-300 ${
-        darkMode
-          ? "bg-slate-950 text-slate-100"
-          : "bg-slate-50 text-slate-900"
-      }`}
+      className={`min-h-screen ${darkMode ? "bg-slate-950" : "bg-slate-100"
+        }`}
     >
-      <SupervisorSidebar
-        onLogout={() => setShowLogout(true)}
-      />
+      <SupervisorSidebar onLogout={() => setShowLogout(true)} />
 
-      <main className="min-h-screen lg:ml-72">
-        <div className="p-4 sm:p-6 lg:p-8">
+      <main className="min-h-screen px-4 py-6 md:ml-72 md:px-7 lg:px-9">
+        <div className="mx-auto max-w-[1500px]">
 
-          {/* HEADER */}
-
-          <section className="relative mb-7 overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-700 p-6 text-white shadow-xl sm:p-8">
-            <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
-
-            <div className="relative flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
+          {/* Header */}
+          <div className={`mb-6 rounded-2xl border p-6 ${surface}`}>
+            <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-bold">
-                  <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-300" />
+                <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-indigo-500">
                   Supervisor Operations
-                </div>
+                </p>
 
-                <h1 className="text-2xl font-black tracking-tight sm:text-3xl lg:text-4xl">
+                <h1 className={`text-2xl font-bold md:text-3xl ${headingText}`}>
                   Complaint Management
                 </h1>
 
-                <p className="mt-3 max-w-2xl text-sm leading-6 text-indigo-100">
-                  Manage assignments, monitor deadlines and verify
-                  completed maintenance work.
+                <p className={`mt-2 text-sm ${secondaryText}`}>
+                  Review complaints, coordinate technicians and monitor resolution progress.
                 </p>
+
+                {assignedBlocks.length > 0 && (
+                  <p className={`mt-3 text-xs ${bodyText}`}>
+                    Assigned Blocks:{" "}
+                    <span className="font-semibold">
+                      {assignedBlocks.join(", ")}
+                    </span>
+                  </p>
+                )}
               </div>
 
-              <div className="min-w-52 rounded-2xl border border-white/20 bg-white/10 p-5">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-200">
-                  Supervisor Access
-                </p>
-
-                <p className="mt-2 text-xl font-black">
-                  {assignedBlocks.length
-                    ? assignedBlocks.join(", ")
-                    : "All Campus"}
-                </p>
-
-                <p className="mt-3 text-xs text-indigo-100">
-                  {totalComplaints} total complaints
-                </p>
-              </div>
+              <button
+                onClick={() => fetchComplaints(true)}
+                disabled={refreshing}
+                className={`${buttonClass} bg-indigo-600 text-white hover:bg-indigo-700`}
+              >
+                {refreshing ? "Refreshing..." : "Refresh Data"}
+              </button>
             </div>
-          </section>
+          </div>
 
-          {/* SELECTED COMPLAINT */}
-
+          {/* Selected Complaint */}
           {selectedComplaintId && (
-            <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-indigo-500/30 bg-indigo-500/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className={`mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4 ${surface}`}>
               <div>
-                <p className="text-sm font-black text-indigo-500">
+                <p className={`font-semibold ${headingText}`}>
                   Viewing Selected Complaint
                 </p>
-                <p className="mt-1 text-xs text-indigo-400">
-                  Opened from dashboard or notification.
+                <p className={`mt-1 text-xs ${secondaryText}`}>
+                  You are viewing one complaint from the dashboard.
                 </p>
               </div>
 
               <button
-                type="button"
                 onClick={handleBackToAll}
-                className="w-fit rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-black text-white"
+                className={`${buttonClass} ${darkMode
+                  ? "bg-slate-700 text-white hover:bg-slate-600"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  }`}
               >
-                ← Back to All Complaints
+                Back to All Complaints
               </button>
             </div>
           )}
 
-          {/* MESSAGES */}
-
+          {/* Messages */}
           {message && (
-            <div className="mb-5 flex items-center gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm font-semibold text-emerald-500">
-              <span>✓</span>
-              <span>{message}</span>
-              <button
-                type="button"
-                onClick={() => setMessage("")}
-                className="ml-auto"
-              >
-                ✕
-              </button>
+            <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
+              {message}
             </div>
           )}
 
           {errorMessage && (
-            <div className="mb-5 flex items-center gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm font-semibold text-red-500">
-              <span>!</span>
+            <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
               <span>{errorMessage}</span>
               <button
-                type="button"
                 onClick={() => setErrorMessage("")}
-                className="ml-auto"
+                className="font-bold"
               >
-                ✕
+                ×
               </button>
             </div>
           )}
 
-          {/* STATISTICS */}
-
-          {!selectedComplaintId && (
-            <section className="mb-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
-              <StatCard
-                title="Total"
-                value={totalComplaints}
-                icon="📋"
-                color={headingText}
-              />
-
-              <StatCard
-                title="Pending"
-                value={pendingComplaints}
-                icon="⏳"
-                color="text-amber-500"
-              />
-
-              <StatCard
-                title="Active"
-                value={activeComplaints}
-                icon="🔧"
-                color="text-violet-500"
-              />
-
-              <StatCard
-                title="Overdue"
-                value={overdueComplaints}
-                icon="⚠️"
-                color="text-red-500"
-              />
-
-              <StatCard
-                title="Verification"
-                value={awaitingVerification}
-                icon="🔍"
-                color="text-orange-500"
-              />
-
-              <StatCard
-                title="Resolved"
-                value={resolvedComplaints}
-                icon="✓"
-                color="text-emerald-500"
-              />
-            </section>
-          )}
-
-          {/* SEARCH AND FILTERS */}
-
-          {!selectedComplaintId && (
-            <section className={`mb-7 rounded-2xl border p-4 shadow-sm sm:p-5 ${surface}`}>
-              <div className="mb-5">
-                <h2 className={`text-base font-black ${headingText}`}>
-                  Find Complaints
-                </h2>
-                <p className={`mt-1 text-xs ${secondaryText}`}>
-                  Search and filter maintenance complaints.
-                </p>
-              </div>
-
-              <div className="grid gap-3 lg:grid-cols-[1.5fr_1fr_1fr_auto]">
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search block, floor, room, category..."
-                  className={`w-full rounded-xl border px-4 py-3 text-sm outline-none ${inputClass}`}
-                />
-
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className={`rounded-xl border px-4 py-3 text-sm outline-none ${inputClass}`}
-                >
-                  <option value="All">All Status</option>
-                  <option value="Pending">Pending</option>
-                  <option value="Assigned">Assigned</option>
-                  <option value="In Progress">In Progress</option>
-                  <option value="Resolved">Resolved</option>
-                </select>
-
-                <select
-                  value={priorityFilter}
-                  onChange={(e) => setPriorityFilter(e.target.value)}
-                  className={`rounded-xl border px-4 py-3 text-sm outline-none ${inputClass}`}
-                >
-                  <option value="All">All Priority</option>
-                  <option value="High">High</option>
-                  <option value="Medium">Medium</option>
-                  <option value="Low">Low</option>
-                </select>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearchTerm("");
-                    setStatusFilter("All");
-                    setPriorityFilter("All");
-                  }}
-                  className={`rounded-xl border px-5 py-3 text-sm font-bold ${
-                    darkMode
-                      ? "border-slate-600 bg-slate-700 text-slate-200"
-                      : "border-slate-200 bg-white text-slate-600"
-                  }`}
-                >
-                  Reset
-                </button>
-              </div>
-
-              <div className="mt-5 flex gap-2 overflow-x-auto pb-1">
-                {[
-                  "All",
-                  "Pending",
-                  "Assigned",
-                  "In Progress",
-                  "Resolved",
-                ].map((filter) => (
-                  <button
-                    key={filter}
-                    type="button"
-                    onClick={() => setStatusFilter(filter)}
-                    className={`whitespace-nowrap rounded-xl border px-3 py-2 text-xs font-bold ${
-                      statusFilter === filter
-                        ? "border-indigo-600 bg-indigo-600 text-white"
-                        : darkMode
-                          ? "border-slate-700 bg-slate-900 text-slate-300"
-                          : "border-slate-200 bg-white text-slate-600"
-                    }`}
-                  >
-                    {filter}
-                    <span className="ml-1.5 opacity-70">
-                      {getFilterCount(filter)}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* LIST HEADER */}
-
-          <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className={`text-xl font-black ${headingText}`}>
-                {selectedComplaintId
-                  ? "Complaint Details"
-                  : "Maintenance Complaints"}
-              </h2>
-
-              <p className={`mt-1 text-xs ${secondaryText}`}>
-                Showing {visibleComplaints.length} complaints
-              </p>
-            </div>
-
-            <button
-              type="button"
-              disabled={refreshing}
-              onClick={() => {
-                fetchComplaints(true);
-                fetchTechnicians();
-              }}
-              className={`w-fit rounded-xl border px-4 py-2.5 text-xs font-black disabled:opacity-50 ${
-                darkMode
-                  ? "border-slate-700 bg-slate-800 text-slate-200"
-                  : "border-slate-200 bg-white text-slate-700"
-              }`}
-            >
-              {refreshing ? "Refreshing..." : "↻ Refresh"}
-            </button>
+          {/* Stats */}
+          <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+            <StatCard label="Total Complaints" value={stats.total} darkMode={darkMode} />
+            <StatCard label="Pending" value={stats.pending} darkMode={darkMode} />
+            <StatCard label="Active" value={stats.active} darkMode={darkMode} />
+            <StatCard label="Resolved" value={stats.resolved} darkMode={darkMode} />
+            <StatCard label="Overdue" value={stats.overdue} darkMode={darkMode} />
+            <StatCard label="Awaiting Review" value={stats.awaitingVerification} darkMode={darkMode} />
           </div>
 
-          {/* LOADING */}
+          {/* Filters */}
+          <section className={`mb-6 rounded-xl border p-5 ${surface}`}>
+            <SectionHeading
+              title="Find Complaints"
+              subtitle="Search and filter complaints."
+              darkMode={darkMode}
+            />
 
-          {loading ? (
-            <div className={`rounded-3xl border p-14 text-center ${surface}`}>
-              <div className="mx-auto h-11 w-11 animate-spin rounded-full border-4 border-slate-300 border-t-indigo-600" />
-              <p className={`mt-5 text-sm font-bold ${headingText}`}>
-                Loading complaints...
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[2fr_1fr_1fr_auto]">
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search by ID, category, block, room..."
+                className={inputClass}
+              />
+
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className={inputClass}
+              >
+                <option value="All">All Statuses</option>
+                <option value="Pending">Pending ({getFilterCount("Pending")})</option>
+                <option value="Assigned">Assigned ({getFilterCount("Assigned")})</option>
+                <option value="In Progress">In Progress ({getFilterCount("In Progress")})</option>
+                <option value="Resolved">Resolved ({getFilterCount("Resolved")})</option>
+              </select>
+
+              <select
+                value={priorityFilter}
+                onChange={(e) => setPriorityFilter(e.target.value)}
+                className={inputClass}
+              >
+                <option value="All">All Priorities</option>
+                <option value="High">High Priority</option>
+                <option value="Medium">Medium Priority</option>
+                <option value="Low">Low Priority</option>
+              </select>
+
+              <button
+                onClick={resetFilters}
+                className={`${buttonClass} ${darkMode
+                  ? "bg-slate-700 text-slate-200 hover:bg-slate-600"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  }`}
+              >
+                Reset Filters
+              </button>
+            </div>
+          </section>
+
+          {/* Complaints Heading */}
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className={`text-xl font-bold ${headingText}`}>
+                Complaints
+              </h2>
+              <p className={`mt-1 text-sm ${secondaryText}`}>
+                Showing {filteredComplaints.length} of {complaints.length} complaints
               </p>
             </div>
-          ) : visibleComplaints.length === 0 ? (
-            <div className={`rounded-3xl border border-dashed p-14 text-center ${surface}`}>
-              <div className="text-4xl">📋</div>
+          </div>
 
-              <h2 className={`mt-5 text-lg font-black ${headingText}`}>
-                No complaints found
-              </h2>
-
+          {/* Complaint List */}
+          {loading ? (
+            <div className={`rounded-xl border p-12 text-center ${surface}`}>
+              <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />
+              <p className={bodyText}>Loading complaints...</p>
+            </div>
+          ) : filteredComplaints.length === 0 ? (
+            <div className={`rounded-xl border p-12 text-center ${surface}`}>
+              <div className="mb-3 text-4xl">📋</div>
+              <h3 className={`text-lg font-bold ${headingText}`}>
+                No Complaints Found
+              </h3>
               <p className={`mt-2 text-sm ${secondaryText}`}>
-                No complaints match your current filters.
+                Try changing your search or filter options.
               </p>
-
-              {selectedComplaintId && (
-                <button
-                  type="button"
-                  onClick={handleBackToAll}
-                  className="mt-5 rounded-xl bg-indigo-600 px-5 py-3 text-xs font-black text-white"
-                >
-                  Back to All Complaints
-                </button>
-              )}
+              <button
+                onClick={resetFilters}
+                className="mt-4 text-sm font-semibold text-indigo-500 hover:underline"
+              >
+                Clear All Filters
+              </button>
             </div>
           ) : (
-            <div className={
-              selectedComplaintId
-                ? "mx-auto max-w-4xl"
-                : "grid gap-5 xl:grid-cols-2"
-            }>
-              {visibleComplaints.map((complaint) => {
-                const categoryTechnicians =
-                  getTechniciansForComplaint(complaint.category);
+            <div className="space-y-4">
+              {filteredComplaints.map((complaint) => {
+                const id = complaint._id;
+                const isExpanded = !!expandedComplaints[id];
 
-                const isResolved =
-                  complaint.status === "Resolved";
+                const deadlineState = getDeadlineState(complaint);
+                const availableTechnicians = getTechniciansForComplaint(
+                  complaint.category
+                );
 
-                const isOverdue =
-                  getDeadlineState(complaint) === "Overdue";
+                const assignedTechnicianId = getTechnicianId(complaint);
 
-                const currentTechnician =
-                  complaint.technician?._id || "";
+                const assignmentHistory = complaint.assignmentHistory || [];
 
-                const selectedValue =
-                  selectedTechnician[complaint._id] ??
-                  currentTechnician;
+                const resolutionRemarks =
+                  complaint.resolutionRemarks ||
+                  complaint.resolutionNote ||
+                  "";
 
-                const requiredSkill =
-                  specializationMap[complaint.category] ||
-                  "General Technician";
+                const completionPhoto =
+                  complaint.completionPhoto ||
+                  complaint.resolutionImage ||
+                  complaint.afterImage;
 
-                const isExpanded =
-                  expandedComplaintId === complaint._id;
+                const complaintImage =
+                  complaint.image ||
+                  complaint.photo ||
+                  complaint.imageUrl;
 
                 const description =
-                  complaint.description ||
-                  "No description provided.";
+                  complaint.description || "No description provided.";
 
-                const needsVerification =
-                  complaint.verificationStatus === "Pending";
+                const locationText = [
+                  complaint.block,
+                  complaint.floor,
+                  complaint.room,
+                ]
+                  .filter(Boolean)
+                  .join(" · ");
 
-                const canAssign =
-                  !isResolved &&
-                  !needsVerification &&
-                  complaint.verificationStatus !== "Approved";
+                const timelineEvents = [
+                  {
+                    title: "Complaint Raised",
+                    date: complaint.createdAt || complaint.date,
+                  },
+                  {
+                    title: "Supervisor Assigned",
+                    date: complaint.assignedAt,
+                  },
+                  {
+                    title: "Technician Assigned",
+                    date: complaint.technicianAssignedAt,
+                  },
+                  {
+                    title: "Complaint Resolved",
+                    date: complaint.resolvedAt,
+                  },
+                ];
 
                 return (
                   <article
-                    id={`complaint-${complaint._id}`}
-                    key={complaint._id}
-                    className={`overflow-hidden rounded-3xl border shadow-sm transition hover:shadow-xl ${
-                      darkMode
-                        ? "border-slate-700 bg-slate-800"
-                        : "border-slate-200 bg-white"
-                    }`}
+                    key={id}
+                    className={`overflow-hidden rounded-2xl border shadow-sm ${surface}`}
                   >
-                    {/* CARD HEADER */}
-
-                    <div className={`border-b p-4 sm:p-5 ${
-                      darkMode
-                        ? "border-slate-700 bg-slate-900/70"
-                        : "border-slate-100 bg-slate-50"
-                    }`}>
-                      <div className="flex items-start justify-between gap-3">
+                    {/* Complaint Header */}
+                    <div
+                      className={`border-b px-5 py-5 md:px-6 ${darkMode
+                        ? "border-slate-700 bg-slate-800/70"
+                        : "border-slate-200 bg-slate-50"
+                        }`}
+                    >
+                      <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
                         <div className="min-w-0">
-                          <div className="flex flex-wrap gap-2">
-                            <span className="rounded-lg bg-indigo-500/10 px-2.5 py-1 text-[11px] font-black text-indigo-500">
-                              {complaint.category}
+                          <div className="mb-3 flex flex-wrap items-center gap-2">
+                            <span className="rounded-md bg-indigo-100 px-2.5 py-1 text-xs font-bold text-indigo-700">
+                              {complaint.category || "General"}
                             </span>
 
-                            <span className={`rounded-lg border px-2.5 py-1 text-[11px] font-black ${getPriorityColor(complaint.priority)}`}>
-                              {complaint.priority || "Normal"}
+                            <span className={`rounded-md px-2.5 py-1 text-xs font-bold ${getPriorityStyle(complaint.priority)}`}>
+                              {complaint.priority || "Normal"} Priority
                             </span>
 
-                            <span className={`rounded-lg border px-2.5 py-1 text-[11px] font-black ${getStatusColor(complaint.status)}`}>
-                              {complaint.status}
+                            <span className={`rounded-md px-2.5 py-1 text-xs font-bold ${getStatusStyle(complaint.status)}`}>
+                              {complaint.status || "Unknown"}
                             </span>
-
-                            {isOverdue && (
-                              <span className="rounded-lg border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-[11px] font-black text-red-500">
-                                OVERDUE
-                              </span>
-                            )}
                           </div>
 
-                          <h3 className={`mt-3 text-base font-black ${headingText}`}>
-                            {complaint.category} Maintenance
+                          <h3 className={`text-lg font-bold md:text-xl ${headingText}`}>
+                            {complaint.title ||
+                              `${complaint.category || "Maintenance"} Complaint`}
                           </h3>
 
                           <p className={`mt-1 text-xs ${secondaryText}`}>
-                            ID: {complaint._id?.slice(-10)}
+                            Complaint ID:{" "}
+                            <span className="font-semibold">
+                              {String(id).slice(-12)}
+                            </span>
                           </p>
                         </div>
 
-                        <div className={`shrink-0 rounded-xl border px-3 py-2 text-right ${surface}`}>
-                          <p className="text-[9px] font-black uppercase text-slate-400">
-                            Location
-                          </p>
-
-                          <p className={`mt-1 text-xs font-black ${bodyText}`}>
-                            {complaint.block || "N/A"}
-                            {complaint.floor ? ` • F${complaint.floor}` : ""}
-                            {complaint.room ? ` • R${complaint.room}` : ""}
-                          </p>
+                        <div className="grid grid-cols-2 gap-5 sm:min-w-[280px]">
+                          <InfoItem
+                            label="Location"
+                            value={locationText}
+                            darkMode={darkMode}
+                          />
+                          <InfoItem
+                            label="Submitted"
+                            value={formatDateTime(complaint.createdAt || complaint.date)}
+                            darkMode={darkMode}
+                          />
                         </div>
                       </div>
                     </div>
 
-                    <div className="p-4 sm:p-5">
+                    <div className="p-5 md:p-6">
 
-                      {/* COMPLAINT IMAGE + DESCRIPTION */}
+                      {/* Complaint Description */}
+                      <section>
+                        <SectionHeading
+                          title="Complaint Details"
+                          subtitle="Read the reported problem and review its attachment."
+                          darkMode={darkMode}
+                        />
 
-                      <div className={
-                        selectedComplaintId
-                          ? "flex flex-col gap-5"
-                          : "flex gap-4"
-                      }>
-                        <div className={
-                          selectedComplaintId
-                            ? "w-full"
-                            : "w-28 shrink-0 sm:w-32"
-                        }>
-                          {complaint.image ? (
-                            <button
-                              type="button"
-                              onClick={() => setPreviewImage(complaint.image)}
-                              className={`block w-full overflow-hidden rounded-2xl border ${
-                                selectedComplaintId
-                                  ? "h-64 sm:h-80"
-                                  : "h-28 sm:h-32"
-                              }`}
-                            >
-                              <img
-                                src={complaint.image}
-                                alt="Complaint"
-                                className="h-full w-full object-cover"
-                              />
-                            </button>
-                          ) : (
-                            <div className={`flex items-center justify-center rounded-2xl border border-dashed text-3xl ${
-                              selectedComplaintId
-                                ? "h-64 sm:h-80"
-                                : "h-28 sm:h-32"
-                            } ${mutedSurface}`}>
-                              🧰
-                            </div>
-                          )}
-
-                          <p className="mt-2 text-center text-[9px] font-bold uppercase text-slate-400">
-                            Complaint Photo
-                          </p>
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                            Issue Description
-                          </p>
-
-                          <p className={`mt-2 text-sm leading-6 ${bodyText} ${
-                            isExpanded ? "" : "line-clamp-4"
-                          }`}>
+                        <div className={`rounded-xl border p-4 md:p-5 ${mutedSurface}`}>
+                          <p className={`whitespace-pre-wrap text-sm leading-7 ${bodyText}`}>
                             {description}
                           </p>
 
-                          {description.length > 180 && (
-                            <button
-                              type="button"
-                              onClick={() => toggleDescription(complaint._id)}
-                              className="mt-2 text-xs font-black text-indigo-500"
-                            >
-                              {isExpanded ? "Read Less ↑" : "Read More →"}
-                            </button>
-                          )}
-
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            <span className="rounded-lg bg-slate-500/10 px-2.5 py-1 text-[10px] font-bold">
-                              📍 {complaint.block || "Block N/A"}
-                            </span>
-
-                            {complaint.floor && (
-                              <span className="rounded-lg bg-slate-500/10 px-2.5 py-1 text-[10px] font-bold">
-                                Floor {complaint.floor}
-                              </span>
-                            )}
-
-                            {complaint.room && (
-                              <span className="rounded-lg bg-slate-500/10 px-2.5 py-1 text-[10px] font-bold">
-                                Room {complaint.room}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* DEADLINE MANAGEMENT */}
-
-                      <section className={`mt-5 rounded-2xl border p-4 ${
-                        darkMode
-                          ? "border-amber-500/30 bg-amber-500/5"
-                          : "border-amber-200 bg-amber-50/60"
-                      }`}>
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div>
-                            <p className="text-[10px] font-black uppercase tracking-wide text-amber-500">
-                              Resolution Deadline
-                            </p>
-
-                            <h4 className={`mt-1 text-sm font-black ${headingText}`}>
-                              {formatDateTime(complaint.deadline)}
-                            </h4>
-
-                            <p className={`mt-1 text-xs ${secondaryText}`}>
-                              {getRemainingTime(complaint.deadline)}
-                            </p>
-                          </div>
-
-                          <span className={`rounded-lg border px-3 py-2 text-[10px] font-black ${getDeadlineColor(getDeadlineState(complaint))}`}>
-                            {getDeadlineState(complaint)}
-                          </span>
-                        </div>
-
-                        {complaint.deadlineReason && (
-                          <p className={`mt-3 text-xs ${secondaryText}`}>
-                            <strong>Deadline reason:</strong>{" "}
-                            {complaint.deadlineReason}
-                          </p>
-                        )}
-
-                        {!isResolved && (
-                          <div className="mt-4 border-t border-slate-500/20 pt-4">
-                            <p className={`mb-3 text-xs font-black ${bodyText}`}>
-                              Set or Change Deadline
-                            </p>
-
-                            <label className="mb-3 flex items-center gap-2 text-xs font-semibold">
-                              <input
-                                type="checkbox"
-                                checked={!!useSuggestedDeadline[complaint._id]}
-                                onChange={(e) =>
-                                  setUseSuggestedDeadline((previous) => ({
-                                    ...previous,
-                                    [complaint._id]: e.target.checked,
-                                  }))
-                                }
-                              />
-                              Use system suggested deadline
-                            </label>
-
-                            {!useSuggestedDeadline[complaint._id] && (
-                              <>
-                                <input
-                                  type="datetime-local"
-                                  min={toDateTimeLocal(new Date())}
-                                  value={
-                                    deadlineValues[complaint._id] ||
-                                    toDateTimeLocal(complaint.deadline)
-                                  }
-                                  onChange={(e) =>
-                                    setDeadlineValues((previous) => ({
-                                      ...previous,
-                                      [complaint._id]: e.target.value,
-                                    }))
-                                  }
-                                  className={`w-full rounded-xl border px-3 py-3 text-xs outline-none ${inputClass}`}
-                                />
-
-                                <textarea
-                                  rows="2"
-                                  value={deadlineReasons[complaint._id] || ""}
-                                  onChange={(e) =>
-                                    setDeadlineReasons((previous) => ({
-                                      ...previous,
-                                      [complaint._id]: e.target.value,
-                                    }))
-                                  }
-                                  placeholder="Reason for setting/changing deadline..."
-                                  className={`mt-3 w-full rounded-xl border px-3 py-3 text-xs outline-none ${inputClass}`}
-                                />
-                              </>
-                            )}
-
-                            <button
-                              type="button"
-                              disabled={deadlineSavingId === complaint._id}
-                              onClick={() => handleSetDeadline(complaint._id)}
-                              className="mt-3 w-full rounded-xl bg-amber-600 px-4 py-3 text-xs font-black text-white transition hover:bg-amber-700 disabled:opacity-50"
-                            >
-                              {deadlineSavingId === complaint._id
-                                ? "Saving Deadline..."
-                                : "Save Deadline"}
-                            </button>
-                          </div>
-                        )}
-                      </section>
-
-                      {/* COMPLETION SUBMISSION */}
-
-                      {(complaint.completionImage ||
-                        complaint.resolutionRemarks ||
-                        complaint.verificationStatus) && (
-                        <section className={`mt-5 rounded-2xl border p-4 ${
-                          darkMode
-                            ? "border-emerald-500/30 bg-emerald-500/5"
-                            : "border-emerald-200 bg-emerald-50/60"
-                        }`}>
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <p className="text-[10px] font-black uppercase tracking-wide text-emerald-500">
-                              Technician Completion Submission
-                            </p>
-
-                            <span className={`rounded-lg border px-2.5 py-1 text-[10px] font-black ${
-                              complaint.verificationStatus === "Approved"
-                                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-500"
-                                : complaint.verificationStatus === "Rejected"
-                                  ? "border-red-500/30 bg-red-500/10 text-red-500"
-                                  : complaint.verificationStatus === "Pending"
-                                    ? "border-amber-500/30 bg-amber-500/10 text-amber-500"
-                                    : "border-slate-500/30 bg-slate-500/10 text-slate-500"
-                            }`}>
-                              {complaint.verificationStatus || "Not Submitted"}
-                            </span>
-                          </div>
-
-                          {complaint.resolutionRemarks && (
-                            <div className="mt-3">
-                              <p className={`text-xs font-black ${bodyText}`}>
-                                Technician Remarks
+                          {complaintImage && (
+                            <div className={`mt-4 border-t pt-4 ${darkMode ? "border-slate-700" : "border-slate-200"
+                              }`}>
+                              <p className={`mb-2 text-xs font-semibold ${secondaryText}`}>
+                                ATTACHMENT
                               </p>
 
-                              <p className={`mt-1 text-sm leading-6 ${secondaryText}`}>
-                                {complaint.resolutionRemarks}
-                              </p>
-                            </div>
-                          )}
-
-                          {complaint.completionImage && (
-                            <div className="mt-3">
                               <button
                                 type="button"
-                                onClick={() => setPreviewImage(complaint.completionImage)}
-                                className="overflow-hidden rounded-xl border border-emerald-500/20"
+                                onClick={() => setPreviewImage(complaintImage)}
+                                className="group overflow-hidden rounded-lg border border-slate-300"
                               >
                                 <img
-                                  src={complaint.completionImage}
-                                  alt="Completion"
-                                  className="h-40 w-full object-cover sm:w-64"
+                                  src={complaintImage}
+                                  alt="Complaint attachment"
+                                  className="h-32 w-44 object-cover transition group-hover:scale-105"
                                 />
                               </button>
-
-                              <p className="mt-1 text-[10px] font-bold text-emerald-500">
-                                View submitted completion photo
-                              </p>
                             </div>
                           )}
-
-                          {complaint.verificationRemarks && (
-                            <p className={`mt-3 text-xs ${secondaryText}`}>
-                              <strong>Verification remarks:</strong>{" "}
-                              {complaint.verificationRemarks}
-                            </p>
-                          )}
-
-                          {needsVerification && (
-                            <div className="mt-4 border-t border-slate-500/20 pt-4">
-                              <p className={`mb-2 text-xs font-black ${bodyText}`}>
-                                Supervisor Verification
-                              </p>
-
-                              <textarea
-                                rows="2"
-                                value={verificationRemarks[complaint._id] || ""}
-                                onChange={(e) =>
-                                  setVerificationRemarks((previous) => ({
-                                    ...previous,
-                                    [complaint._id]: e.target.value,
-                                  }))
-                                }
-                                placeholder="Remarks (required if rejecting)..."
-                                className={`w-full rounded-xl border px-3 py-3 text-xs outline-none ${inputClass}`}
-                              />
-
-                              <div className="mt-3 grid grid-cols-2 gap-3">
-                                <button
-                                  type="button"
-                                  disabled={verifyingId === complaint._id}
-                                  onClick={() =>
-                                    handleVerification(complaint._id, "Approved")
-                                  }
-                                  className="rounded-xl bg-emerald-600 px-3 py-3 text-xs font-black text-white hover:bg-emerald-700 disabled:opacity-50"
-                                >
-                                  {verifyingId === complaint._id
-                                    ? "Please wait..."
-                                    : "✓ Approve"}
-                                </button>
-
-                                <button
-                                  type="button"
-                                  disabled={verifyingId === complaint._id}
-                                  onClick={() =>
-                                    handleVerification(complaint._id, "Rejected")
-                                  }
-                                  className="rounded-xl bg-red-600 px-3 py-3 text-xs font-black text-white hover:bg-red-700 disabled:opacity-50"
-                                >
-                                  ✕ Reject
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </section>
-                      )}
-
-                      {/* TECHNICIAN ASSIGNMENT */}
-
-                      <section className={`mt-5 rounded-2xl border p-4 ${
-                        darkMode
-                          ? "border-indigo-500/30 bg-indigo-500/5"
-                          : "border-indigo-100 bg-indigo-50/60"
-                      }`}>
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="text-[10px] font-black uppercase tracking-wide text-indigo-500">
-                              Technician Assignment
-                            </p>
-
-                            <h4 className={`mt-1 text-sm font-black ${headingText}`}>
-                              {complaint.technician
-                                ? "Current Technician"
-                                : "Needs Technician"}
-                            </h4>
-                          </div>
-
-                          <div className={`rounded-xl px-3 py-2 text-center ${surface}`}>
-                            <p className="text-sm font-black text-indigo-500">
-                              {categoryTechnicians.length}
-                            </p>
-                            <p className="text-[8px] font-black uppercase text-slate-400">
-                              Qualified
-                            </p>
-                          </div>
                         </div>
-
-                        {complaint.technician && (
-                          <div className={`mt-3 rounded-xl border p-3 ${surface}`}>
-                            <div className="flex items-center gap-3">
-                              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/10">
-                                🛠️
-                              </div>
-
-                              <div className="min-w-0 flex-1">
-                                <p className={`truncate text-xs font-black ${headingText}`}>
-                                  {complaint.technician.name}
-                                </p>
-
-                                <p className={`mt-1 text-[10px] ${secondaryText}`}>
-                                  {complaint.technician.specialization}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {isResolved ? (
-                          <div className="mt-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3">
-                            <p className="text-xs font-black text-emerald-500">
-                              ✓ Complaint Resolved
-                            </p>
-                            <p className="mt-1 text-[10px] text-emerald-500">
-                              This complaint has been verified and closed.
-                            </p>
-                          </div>
-                        ) : canAssign ? (
-                          <div className="mt-4">
-                            <label className={`mb-2 block text-xs font-black ${bodyText}`}>
-                              Select Technician
-                            </label>
-
-                            <select
-                              value={selectedValue}
-                              onChange={(e) =>
-                                setSelectedTechnician((previous) => ({
-                                  ...previous,
-                                  [complaint._id]: e.target.value,
-                                }))
-                              }
-                              className={`w-full rounded-xl border px-3 py-3 text-xs outline-none ${inputClass}`}
-                            >
-                              <option value="">
-                                Select qualified technician
-                              </option>
-
-                              {categoryTechnicians.map((technician) => (
-                                <option
-                                  key={technician._id}
-                                  value={technician._id}
-                                >
-                                  {technician.name} — {technician.specialization}
-                                  {" | "}
-                                  Workload: {technician.workloadLevel || "Low"}
-                                  {" ("}
-                                  {technician.activeComplaints ?? 0}
-                                  {")"}
-                                </option>
-                              ))}
-                            </select>
-
-                            {selectedValue && (
-                              <div className="mt-2 rounded-xl bg-slate-500/10 p-3">
-                                {(() => {
-                                  const selected = technicians.find(
-                                    (item) => item._id === selectedValue
-                                  );
-
-                                  if (!selected) return null;
-
-                                  return (
-                                    <>
-                                      <p className={`text-xs font-bold ${headingText}`}>
-                                        {selected.name}
-                                      </p>
-
-                                      <p className={`mt-1 text-[10px] ${secondaryText}`}>
-                                        Active complaints: {selected.activeComplaints ?? 0}
-                                      </p>
-
-                                      <p className={`mt-1 text-[10px] font-bold ${getWorkloadColor(selected.workloadLevel)}`}>
-                                        Workload: {selected.workloadLevel || "Low"}
-                                      </p>
-                                    </>
-                                  );
-                                })()}
-                              </div>
-                            )}
-
-                            <textarea
-                              rows="2"
-                              value={assignmentReasons[complaint._id] || ""}
-                              onChange={(e) =>
-                                setAssignmentReasons((previous) => ({
-                                  ...previous,
-                                  [complaint._id]: e.target.value,
-                                }))
-                              }
-                              placeholder="Reason for assignment/reassignment (required)..."
-                              className={`mt-3 w-full rounded-xl border px-3 py-3 text-xs outline-none ${inputClass}`}
-                            />
-
-                            <button
-                              type="button"
-                              onClick={() => handleAssignTechnician(complaint._id)}
-                              disabled={
-                                !selectedValue ||
-                                !assignmentReasons[complaint._id]?.trim() ||
-                                assigningId === complaint._id ||
-                                categoryTechnicians.length === 0
-                              }
-                              className="mt-3 w-full rounded-xl bg-indigo-600 px-4 py-3 text-xs font-black text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-500"
-                            >
-                              {assigningId === complaint._id
-                                ? "Assigning..."
-                                : complaint.technician
-                                  ? "Reassign Technician"
-                                  : "Assign Technician"}
-                            </button>
-                          </div>
-                        ) : needsVerification ? (
-                          <p className="mt-3 rounded-xl bg-amber-500/10 p-3 text-xs font-semibold text-amber-500">
-                            Technician completion is awaiting your verification. Verify it before making another assignment.
-                          </p>
-                        ) : null}
-
-                        {categoryTechnicians.length === 0 && !isResolved && (
-                          <p className="mt-3 rounded-xl bg-amber-500/10 p-3 text-xs font-semibold text-amber-500">
-                            No qualified technician is currently available.
-                          </p>
-                        )}
                       </section>
 
-                      {/* HISTORY */}
-
-                      <section className={`mt-5 rounded-2xl border p-4 ${mutedSurface}`}>
-                        <p className="text-[10px] font-black uppercase tracking-wide text-slate-400">
-                          Complaint Timeline
-                        </p>
-
-                        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                          {[
-                            {
-                              title: "Complaint Created",
-                              date: complaint.createdAt,
-                              color: "bg-indigo-500",
-                            },
-                            {
-                              title: "Supervisor Assigned",
-                              date: complaint.assignedAt,
-                              color: "bg-blue-500",
-                            },
-                            {
-                              title: "Technician Assigned",
-                              date: complaint.technicianAssignedAt,
-                              color: "bg-violet-500",
-                            },
-                            {
-                              title: "Resolved",
-                              date: complaint.resolvedAt,
-                              color: "bg-emerald-500",
-                            },
-                          ].map((item) => (
-                            <div key={item.title} className="flex gap-3">
-                              <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${item.color}`} />
-
-                              <div>
-                                <p className={`text-[10px] font-black ${bodyText}`}>
-                                  {item.title}
-                                </p>
-
-                                <p className={`mt-1 text-[9px] ${secondaryText}`}>
-                                  {formatDateTime(item.date)}
-                                </p>
-                              </div>
+                      {/* Read-only Deadline */}
+                      <section className="mt-4">
+                        <div className={`rounded-xl border p-4 ${mutedSurface}`}>
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <p className={`text-xs font-semibold uppercase tracking-wide ${secondaryText}`}>
+                                Resolution Deadline
+                              </p>
+                              <p className={`mt-1 text-sm font-bold ${headingText}`}>
+                                {formatDateTime(complaint.deadline)}
+                              </p>
                             </div>
-                          ))}
-                        </div>
 
-                        {/* ASSIGNMENT HISTORY */}
+                            <div className="text-left sm:text-right">
+                              <p className={`text-xs ${secondaryText}`}>
+                                Time Remaining
+                              </p>
+                              <p className={`mt-1 text-sm font-bold ${getDeadlineStyle(deadlineState)}`}>
+                                {getRemainingTime(complaint.deadline)}
+                              </p>
+                            </div>
 
-                        {complaint.assignmentHistory?.length > 0 && (
-                          <div className="mt-5 border-t border-slate-500/20 pt-4">
-                            <p className={`mb-3 text-xs font-black ${bodyText}`}>
-                              Assignment History
+                            <span className={`rounded-full px-3 py-1 text-xs font-bold ${deadlineState === "Overdue"
+                              ? "bg-red-100 text-red-700"
+                              : deadlineState === "On Track"
+                                ? "bg-emerald-100 text-emerald-700"
+                                : deadlineState === "Completed"
+                                  ? "bg-blue-100 text-blue-700"
+                                  : "bg-slate-200 text-slate-700"
+                              }`}>
+                              {deadlineState}
+                            </span>
+                          </div>
+
+                          {complaint.deadlineReason && (
+                            <p className={`mt-3 border-t pt-3 text-xs leading-5 ${darkMode
+                              ? "border-slate-700 text-slate-400"
+                              : "border-slate-200 text-slate-500"
+                              }`}>
+                              <span className="font-semibold">Reason: </span>
+                              {complaint.deadlineReason}
                             </p>
+                          )}
+                        </div>
+                      </section>
 
-                            {complaint.assignmentHistory.map((item, index) => (
-                              <div
-                                key={index}
-                                className="mb-3 rounded-xl bg-slate-500/5 p-3"
-                              >
-                                <p className={`text-xs font-bold ${headingText}`}>
-                                  Assignment #{index + 1}
-                                </p>
+                      {/* Expanded Details */}
+                      {isExpanded && (
+                        <div className={`mt-5 space-y-5 border-t pt-5 ${darkMode ? "border-slate-700" : "border-slate-200"
+                          }`}>
 
-                                <p className={`mt-1 text-[10px] ${secondaryText}`}>
-                                  {formatDateTime(item.assignedAt)}
-                                </p>
+                          {/* Technician Assignment */}
+                          {complaint.status !== "Resolved" && (
+                            <section>
+                              <SectionHeading
+                                title="Technician Assignment"
+                                subtitle="Assign a suitable technician to handle this complaint."
+                                darkMode={darkMode}
+                              />
 
-                                {item.reason && (
-                                  <p className={`mt-1 text-xs ${bodyText}`}>
-                                    Reason: {item.reason}
+                              <div className={`rounded-xl border p-4 ${mutedSurface}`}>
+                                <div className="mb-4">
+                                  <InfoItem
+                                    label="Currently Assigned Technician"
+                                    value={getTechnicianName(complaint)}
+                                    darkMode={darkMode}
+                                  />
+                                </div>
+
+                                <div className="grid gap-3 md:grid-cols-2">
+                                  <select
+                                    value={
+                                      selectedTechnician[id] ||
+                                      assignedTechnicianId ||
+                                      ""
+                                    }
+                                    onChange={(e) =>
+                                      setSelectedTechnician((prev) => ({
+                                        ...prev,
+                                        [id]: e.target.value,
+                                      }))
+                                    }
+                                    className={inputClass}
+                                  >
+                                    <option value="">Select Technician</option>
+
+                                    {availableTechnicians.map((technician) => (
+                                      <option
+                                        key={technician._id}
+                                        value={technician._id}
+                                      >
+                                        {technician.name ||
+                                          technician.fullName ||
+                                          "Technician"}
+                                        {technician.specialization
+                                          ? ` — ${technician.specialization}`
+                                          : ""}
+                                      </option>
+                                    ))}
+                                  </select>
+
+                                  <input
+                                    type="text"
+                                    value={assignmentReasons[id] || ""}
+                                    onChange={(e) =>
+                                      setAssignmentReasons((prev) => ({
+                                        ...prev,
+                                        [id]: e.target.value,
+                                      }))
+                                    }
+                                    placeholder="Reason for assignment / reassignment"
+                                    className={inputClass}
+                                  />
+                                </div>
+
+                                <button
+                                  onClick={() => handleAssignTechnician(id)}
+                                  disabled={assigningId === id}
+                                  className={`${buttonClass} mt-3 bg-indigo-600 text-white hover:bg-indigo-700`}
+                                >
+                                  {assigningId === id
+                                    ? "Assigning..."
+                                    : assignedTechnicianId
+                                      ? "Reassign Technician"
+                                      : "Assign Technician"}
+                                </button>
+
+                                {availableTechnicians.length === 0 && (
+                                  <p className="mt-3 text-xs font-medium text-amber-600">
+                                    No matching technician is currently available for this category.
                                   </p>
                                 )}
                               </div>
-                            ))}
-                          </div>
-                        )}
+                            </section>
 
-                        {/* DEADLINE HISTORY */}
+                          )}
+                          {/* Completion & Verification */}
+                          <section>
+                            <SectionHeading
+                              title="Completion & Verification"
+                              subtitle="Review the technician's submitted work."
+                              darkMode={darkMode}
+                            />
 
-                        {complaint.deadlineHistory?.length > 0 && (
-                          <div className="mt-5 border-t border-slate-500/20 pt-4">
-                            <p className={`mb-3 text-xs font-black ${bodyText}`}>
-                              Deadline History
-                            </p>
-
-                            {complaint.deadlineHistory.map((item, index) => (
-                              <div
-                                key={index}
-                                className="mb-3 rounded-xl bg-slate-500/5 p-3"
-                              >
-                                <p className={`text-xs font-bold ${headingText}`}>
-                                  Deadline Update #{index + 1}
-                                </p>
-
-                                <p className={`mt-1 text-[10px] ${secondaryText}`}>
-                                  New deadline: {formatDateTime(item.newDeadline)}
-                                </p>
-
-                                <p className={`mt-1 text-xs ${bodyText}`}>
-                                  Reason: {item.reason}
-                                </p>
+                            <div className={`rounded-xl border p-4 ${mutedSurface}`}>
+                              <div className="mb-4 grid gap-4 sm:grid-cols-2">
+                                <InfoItem
+                                  label="Verification Status"
+                                  value={complaint.verificationStatus || "Not submitted"}
+                                  darkMode={darkMode}
+                                />
+                                <InfoItem
+                                  label="Complaint Status"
+                                  value={complaint.status}
+                                  darkMode={darkMode}
+                                />
                               </div>
-                            ))}
-                          </div>
-                        )}
-                      </section>
 
-                      {selectedComplaintId && (
-                        <button
-                          type="button"
-                          onClick={handleBackToAll}
-                          className="mt-5 w-full rounded-xl border border-slate-500/30 px-4 py-3 text-xs font-black"
-                        >
-                          ← Back to All Complaints
-                        </button>
+                              {resolutionRemarks && (
+                                <div className="mb-4">
+                                  <p className={`mb-1 text-xs font-semibold ${secondaryText}`}>
+                                    TECHNICIAN'S REMARKS
+                                  </p>
+                                  <p className={`whitespace-pre-wrap text-sm leading-6 ${bodyText}`}>
+                                    {resolutionRemarks}
+                                  </p>
+                                </div>
+                              )}
+
+                              {completionPhoto && (
+                                <div className="mb-4">
+                                  <p className={`mb-2 text-xs font-semibold ${secondaryText}`}>
+                                    COMPLETION PHOTO
+                                  </p>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => setPreviewImage(completionPhoto)}
+                                    className="overflow-hidden rounded-lg border border-slate-300"
+                                  >
+                                    <img
+                                      src={completionPhoto}
+                                      alt="Completed work"
+                                      className="h-32 w-44 object-cover"
+                                    />
+                                  </button>
+                                </div>
+                              )}
+
+{complaint.verificationStatus === "Pending" &&
+  complaint.status !== "Resolved" && (
+                                  <div className={`border-t pt-4 ${darkMode ? "border-slate-700" : "border-slate-200"
+                                    }`}>
+                                    <label className={`mb-2 block text-sm font-semibold ${headingText}`}>
+                                      Verification Remarks
+                                    </label>
+
+                                    <textarea
+                                      rows={3}
+                                      value={verificationRemarks[id] || ""}
+                                      onChange={(e) =>
+                                        setVerificationRemarks((prev) => ({
+                                          ...prev,
+                                          [id]: e.target.value,
+                                        }))
+                                      }
+                                      placeholder="Enter remarks (required for rejection)..."
+                                      className={inputClass}
+                                    />
+
+                                    <div className="mt-3 flex flex-wrap gap-3">
+                                      <button
+                                        onClick={() => handleVerification(id, "Approved")}
+                                        disabled={verifyingId === id}
+                                        className={`${buttonClass} bg-emerald-600 text-white hover:bg-emerald-700`}
+                                      >
+                                        {verifyingId === id
+                                          ? "Processing..."
+                                          : "Approve Completion"}
+                                      </button>
+
+                                      <button
+                                        onClick={() => handleVerification(id, "Rejected")}
+                                        disabled={verifyingId === id}
+                                        className={`${buttonClass} bg-red-600 text-white hover:bg-red-700`}
+                                      >
+                                        Reject Completion
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+
+                              {complaint.verificationStatus === "Approved" && (
+                                <p className="rounded-lg bg-emerald-100 px-3 py-2 text-sm font-semibold text-emerald-800">
+                                  Completion has been approved.
+                                </p>
+                              )}
+                            </div>
+                          </section>
+
+                          {/* Compact Timeline */}
+                          <section>
+                            <SectionHeading
+                              title="Complaint Timeline"
+                              subtitle="Important complaint activity."
+                              darkMode={darkMode}
+                            />
+
+                            <div className={`rounded-xl border p-4 ${mutedSurface}`}>
+                              <div className="space-y-4">
+                                {timelineEvents.map((event, index) => (
+                                  <div key={event.title} className="flex items-start gap-3">
+                                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${event.date
+                                      ? "bg-indigo-600 text-white"
+                                      : darkMode
+                                        ? "bg-slate-700 text-slate-400"
+                                        : "bg-slate-200 text-slate-500"
+                                      }`}>
+                                      {index + 1}
+                                    </div>
+
+                                    <div className="min-w-0 flex-1">
+                                      <p className={`text-sm font-semibold ${headingText}`}>
+                                        {event.title}
+                                      </p>
+                                      <p className={`mt-1 text-xs ${secondaryText}`}>
+                                        {formatDateTime(event.date)}
+                                      </p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </section>
+
+                          {/* Assignment History */}
+                          {assignmentHistory.length > 0 && (
+                            <section>
+                              <SectionHeading
+                                title="Assignment History"
+                                subtitle="Previous technician assignments."
+                                darkMode={darkMode}
+                              />
+
+                              <div className={`overflow-hidden rounded-xl border ${surface}`}>
+                                <div className="overflow-x-auto">
+                                  <table className="w-full min-w-[500px] text-left text-sm">
+                                    <thead className={
+                                      darkMode
+                                        ? "bg-slate-900 text-slate-300"
+                                        : "bg-slate-100 text-slate-600"
+                                    }>
+                                      <tr>
+                                        <th className="px-4 py-3 font-semibold">Technician</th>
+                                        <th className="px-4 py-3 font-semibold">Assigned At</th>
+                                        <th className="px-4 py-3 font-semibold">Reason</th>
+                                      </tr>
+                                    </thead>
+
+                                    <tbody>
+                                      {assignmentHistory.map((history, index) => (
+                                        <tr
+                                          key={history._id || index}
+                                          className={`border-t ${darkMode
+                                            ? "border-slate-700 text-slate-300"
+                                            : "border-slate-200 text-slate-700"
+                                            }`}
+                                        >
+                                          <td className="px-4 py-3 font-medium">
+                                            {history.technician?.name ||
+                                              history.technicianName ||
+                                              "Technician"}
+                                          </td>
+                                          <td className="px-4 py-3">
+                                            {formatDateTime(history.assignedAt)}
+                                          </td>
+                                          <td className="px-4 py-3">
+                                            {history.reason || "Not provided"}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            </section>
+                          )}
+                        </div>
                       )}
+                      {/* Delete Resolved Complaint */}
+                      {complaint.status === "Resolved" && (
+                        <div className="mt-5 flex justify-end">
+                          <button
+                            onClick={() => handleDeleteComplaint(id)}
+                            disabled={deletingId === id}
+                            className={`${buttonClass} bg-red-600 text-white hover:bg-red-700`}
+                          >
+                            {deletingId === id ? "Deleting..." : "Delete Complaint"}
+                          </button>
+                        </div>
+                      )}
+                      {/* Read More / Read Less */}
+                      <div className="mt-5 flex justify-center">
+                        <button
+                          onClick={() => toggleComplaint(id)}
+                          className="inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-6 py-2.5 text-sm font-bold text-indigo-700 transition hover:bg-indigo-100 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-500/20"
+                        >
+                          {isExpanded ? "Show Less ↑" : "View More Details ↓"}
+                        </button>
+                      </div>
                     </div>
                   </article>
                 );
@@ -1604,45 +1227,34 @@ function SupervisorComplaints() {
         </div>
       </main>
 
-      {/* IMAGE PREVIEW */}
-
+      {/* Image Preview Modal */}
       {previewImage && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4"
           onClick={() => setPreviewImage(null)}
         >
-          <div
-            className={`relative max-h-[90vh] max-w-5xl overflow-hidden rounded-2xl p-2 shadow-2xl ${
-              darkMode ? "bg-slate-800" : "bg-white"
-            }`}
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="relative max-h-[90vh] max-w-5xl">
             <button
-              type="button"
               onClick={() => setPreviewImage(null)}
-              className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/70 text-lg font-bold text-white"
+              className="absolute -right-3 -top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white text-xl font-bold text-slate-900 shadow-lg"
             >
-              ✕
+              ×
             </button>
 
             <img
               src={previewImage}
-              alt="Complaint preview"
+              alt="Complaint Preview"
               className="max-h-[85vh] max-w-full rounded-xl object-contain"
+              onClick={(e) => e.stopPropagation()}
             />
           </div>
         </div>
       )}
 
-      {/* LOGOUT */}
-
-      {showLogout && (
-        <LogoutModal
-          onClose={() => setShowLogout(false)}
-        />
-      )}
+      <LogoutModal
+        isOpen={showLogout}
+        onClose={() => setShowLogout(false)}
+      />
     </div>
   );
 }
-
-export default SupervisorComplaints;
