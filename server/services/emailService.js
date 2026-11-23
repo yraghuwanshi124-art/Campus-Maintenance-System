@@ -19,10 +19,10 @@ transporter.verify((error, success) => {
   }
 });
 
-console.log("EMAIL_USER:", process.env.EMAIL_USER);
-console.log("EMAIL_PASS exists:", !!process.env.EMAIL_PASS);
-console.log("ADMIN_EMAIL:", process.env.ADMIN_EMAIL);
-console.log("EMAIL_PASS length:", process.env.EMAIL_PASS?.length);
+// console.log("EMAIL_USER:", process.env.EMAIL_USER);
+// console.log("EMAIL_PASS exists:", !!process.env.EMAIL_PASS);
+// console.log("ADMIN_EMAIL:", process.env.ADMIN_EMAIL);
+// console.log("EMAIL_PASS length:", process.env.EMAIL_PASS?.length);
 // ================= NEW COMPLAINT NOTIFICATION =================
 
 const sendComplaintNotification = async (complaint) => {
@@ -72,7 +72,7 @@ const sendComplaintNotification = async (complaint) => {
 
 const sendTechnicianAssignmentEmail = async (complaint, technician) => {
   try {
-    console.log("Technician email:", process.env.TECHNICIAN_EMAIL);
+    // console.log("Technician email:", process.env.TECHNICIAN_EMAIL);
 
     await transporter.sendMail({
       from: `"CampusFix" <${process.env.EMAIL_USER}>`,
