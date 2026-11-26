@@ -239,26 +239,40 @@ export default function SupervisorComplaints() {
     }));
   };
 
-  // Technician specialization
-  const specializationMap = {
-    Computer: "Computer Technician",
-    Fan: "Electrician",
-    Light: "Electrician",
-    AC: "AC Technician",
-    Door: "Carpenter",
-    Furniture: "Carpenter",
-  };
+// Technician specialization mapping
+const specializationMap = {
+  // Computer / IT
+  Computer: "Computer Technician",
 
-  const getTechniciansForComplaint = (category) => {
-    const required = specializationMap[category];
+  // Electrical
+  Fan: "Electrician",
+  Light: "Electrician",
+  Projector: "Electrician",
 
-    return technicians.filter(
-      (technician) =>
-        !required ||
-        technician.specialization === required ||
-        technician.specialization === "General"
+  // Cooling
+  AC: "AC Technician",
+
+  // Carpentry
+  Door: "Carpenter",
+  Furniture: "Carpenter",
+};
+
+// Get technicians according to complaint category
+const getTechniciansForComplaint = (category) => {
+  if (!category) return [];
+
+  const requiredSpecialization = specializationMap[category.trim()];
+
+  // Unknown category: show no technician
+  if (!requiredSpecialization) return [];
+
+  return technicians.filter((technician) => {
+    return (
+      technician.specialization?.trim().toLowerCase() ===
+      requiredSpecialization.toLowerCase()
     );
-  };
+  });
+};
 
   // Assign technician
   const handleAssignTechnician = async (complaintId) => {
